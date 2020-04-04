@@ -40,15 +40,15 @@
 #include "base/string_utils.hpp"
 #include "base/timer.hpp"
 
+#include "defines.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
-#include <thread>
-
-#include "defines.hpp"
 
 using namespace std;
 
@@ -322,8 +322,11 @@ public:
       return;
 
     // Road number.
-    if (hasStreetType && !f.GetParams().ref.empty())
-      inserter(StringUtf8Multilang::kDefaultCode, f.GetParams().ref);
+    if (hasStreetType)
+    {
+      for (auto const & shield : feature::GetRoadShieldsNames(f.GetRoadNumber()))
+        inserter(StringUtf8Multilang::kDefaultCode, shield);
+    }
 
     if (ftypes::IsAirportChecker::Instance()(types))
     {

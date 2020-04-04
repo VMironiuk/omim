@@ -1,18 +1,19 @@
-#!/usr/bin/env python
-import argparse
+import logging
 import os
 import timeit
 
-from pygen import classif
-from pygen import mwm
+import mwm
+
+logger = logging.getLogger("mwm")
+logger.setLevel(logging.ERROR)
 
 
 def example__storing_features_in_a_collection(path):
     ft_list = [ft for ft in mwm.Mwm(path)]
-    print("List size:", len(ft_list))
+    print(f"List size: {len(ft_list)}")
 
     ft_tuple = tuple(ft for ft in mwm.Mwm(path))
-    print("Tuple size:", len(ft_tuple))
+    print(f"Tuple size: {len(ft_tuple)}")
 
     def slow():
         ft_with_metadata_list = []
@@ -32,9 +33,9 @@ def example__storing_features_in_a_collection(path):
                 ft_with_metadata_list.append(ft.parse())
         return ft_with_metadata_list
 
-    tslow = timeit.timeit(slow, number=100)
-    tfast = timeit.timeit(fast, number=100)
-    print("Slow took {}, fast took {}.".format(tslow, tfast))
+    tslow = timeit.timeit(slow, number=10)
+    tfast = timeit.timeit(fast, number=10)
+    print(f"Slow took {tslow}, fast took {tfast}.")
 
 
 def example__features_generator(path):
@@ -72,7 +73,7 @@ def example__sequential_processing(path):
 
 def example__working_with_features(path):
     it = iter(mwm.Mwm(path))
-    ft = it.next()
+    ft = next(it)
     print("Feature members are:", dir(ft))
 
     print("index:", ft.index())
@@ -80,7 +81,7 @@ def example__working_with_features(path):
         "types:",
         ft.types(),
         "redable types:",
-        [classif.readable_type(t) for t in ft.types()],
+        [mwm.readable_type(t) for t in ft.types()],
     )
     print("metadata:", ft.metadata())
     print("names:", ft.names())
@@ -98,15 +99,17 @@ def example__working_with_features(path):
     print("__repr__:", ft)
 
     for ft in it:
-      geometry = ft.geometry()
-      if ft.geom_type() == mwm.GeomType.area and len(geometry) < 10:
-        print("area geometry", geometry)
-        break
+        geometry = ft.geometry()
+        if ft.geom_type() == mwm.GeomType.area and len(geometry) < 10:
+            print("area geometry", geometry)
+            break
+
 
 def example__working_with_mwm(path):
     map = mwm.Mwm(path)
-    print("Mwm members are:", dir(map))
 
+    print("Mwm members are:", dir(map))
+    print(map)
     print("version:", map.version())
     print("type:", map.type())
     print("bounds:", map.bounds())
@@ -125,6 +128,7 @@ if __name__ == "__main__":
     main(
         os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
+            "..",
             "..",
             "..",
             "data",

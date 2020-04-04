@@ -2375,6 +2375,30 @@ UNIT_CLASS_TEST(ProcessorTest, StreetNumber)
   }
 }
 
+UNIT_CLASS_TEST(ProcessorTest, StreetNumberEnriched)
+{
+  string const countryName = "Wonderland";
+
+  TestStreet street(vector<m2::PointD>{m2::PointD(-1.0, -1.0), m2::PointD(1.0, 1.0)}, "Нева", "ru");
+  street.SetRoadNumber("M-11;ru:national/M-11");
+
+  auto countryId =
+      BuildCountry(countryName, [&](TestMwmBuilder & builder) { builder.Add(street); });
+
+  SetViewport(m2::RectD(m2::PointD(0.0, 0.0), m2::PointD(1.0, 2.0)));
+  {
+    Rules rules = {ExactMatch(countryId, street)};
+    TEST(ResultsMatch("M-11 ", rules), ());
+  }
+
+  SetViewport(m2::RectD(m2::PointD(0.0, 0.0), m2::PointD(1.0, 2.0)));
+  {
+    Rules rules = {};
+    TEST(ResultsMatch("ru ", rules), ());
+    TEST(ResultsMatch("national ", rules), ());
+  }
+}
+
 UNIT_CLASS_TEST(ProcessorTest, Postbox)
 {
   string const countryName = "Wonderland";
@@ -2629,6 +2653,112 @@ UNIT_CLASS_TEST(ProcessorTest, FilterStreetPredictions)
     params.m_streetSearchRadiusM =
         mercator::DistanceOnEarth(params.m_viewport.Center(), m2::PointD(1.0, 0.0)) - 1.0;
     params.m_query = "SmallCity Lenina";
+
+    TestSearchRequest request(m_engine, params);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+}
+
+UNIT_CLASS_TEST(ProcessorTest, FilterVillages)
+{
+  TestState moscowRegion(m2::PointD(10.0, 10.0), "Moscow Region", "en");
+  // |moscowRegion| feature should belong to MoscowRegion with some margin due to mwmPointAccuracy.
+  TestPOI dummy(m2::PointD(9.99, 9.99), "", "en");
+  TestVillage petrovskoeMoscow(m2::PointD(10.5, 10.5), "Petrovskoe", "en", 5 /* rank */);
+
+  TestVillage petrovskoe0(m2::PointD(0.0, 0.0), "Petrovskoe", "en", 5 /* rank */);
+  TestVillage petrovskoe1(m2::PointD(1.0, 1.0), "Petrovskoe", "en", 5 /* rank */);
+  TestVillage petrovskoe2(m2::PointD(2.0, 2.0), "Petrovskoe", "en", 5 /* rank */);
+
+  auto const moscowId = BuildCountry("MoscowRegion", [&](TestMwmBuilder & builder) {
+    builder.Add(petrovskoeMoscow);
+    builder.Add(dummy);
+  });
+
+  auto const otherId = BuildCountry("OtherRegion", [&](TestMwmBuilder & builder) {
+    builder.Add(petrovskoe0);
+    builder.Add(petrovskoe1);
+    builder.Add(petrovskoe2);
+  });
+
+  BuildWorld([&](TestMwmBuilder & builder) { builder.Add(moscowRegion); });
+
+  SearchParams defaultParams;
+  defaultParams.m_query = "Petrovskoe";
+  defaultParams.m_inputLocale = "en";
+  defaultParams.m_viewport = m2::RectD(m2::PointD(-1.0, -1.0), m2::PointD(1.0, 1.0));
+  defaultParams.m_mode = Mode::Everywhere;
+  defaultParams.m_villageSearchRadiusM = TestSearchRequest::kDefaultTestVillageSearchRadiusM;
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0), ExactMatch(otherId, petrovskoe1),
+                         ExactMatch(otherId, petrovskoe2), ExactMatch(moscowId, petrovskoeMoscow)};
+
+    TestSearchRequest request(m_engine, defaultParams);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0), ExactMatch(otherId, petrovskoe1),
+                         ExactMatch(otherId, petrovskoe2)};
+
+    auto params = defaultParams;
+    params.m_villageSearchRadiusM =
+        mercator::DistanceOnEarth(params.m_viewport.Center(), petrovskoeMoscow.GetCenter()) - 1.0;
+
+    TestSearchRequest request(m_engine, params);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0), ExactMatch(otherId, petrovskoe1)};
+
+    auto params = defaultParams;
+    params.m_villageSearchRadiusM =
+        mercator::DistanceOnEarth(params.m_viewport.Center(), petrovskoe2.GetCenter()) - 1.0;
+
+    TestSearchRequest request(m_engine, params);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0)};
+
+    auto params = defaultParams;
+    params.m_villageSearchRadiusM =
+        mercator::DistanceOnEarth(params.m_viewport.Center(), petrovskoe1.GetCenter()) - 1.0;
+
+    TestSearchRequest request(m_engine, params);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0), ExactMatch(otherId, petrovskoe2)};
+
+    auto params = defaultParams;
+    params.m_position = m2::PointD(2.0, 2.0);
+    params.m_villageSearchRadiusM =
+        min(mercator::DistanceOnEarth(params.m_viewport.Center(), petrovskoe1.GetCenter()),
+            mercator::DistanceOnEarth(*params.m_position, petrovskoe1.GetCenter()));
+    params.m_villageSearchRadiusM -= 1.0;
+
+    TestSearchRequest request(m_engine, params);
+    request.Run();
+    TEST(ResultsMatch(request.Results(), rules), ());
+  }
+
+  {
+    Rules const rules = {ExactMatch(otherId, petrovskoe0), ExactMatch(moscowId, petrovskoeMoscow)};
+
+    auto params = defaultParams;
+    params.m_villageSearchRadiusM =
+        mercator::DistanceOnEarth(params.m_viewport.Center(), petrovskoe1.GetCenter()) - 1.0;
+    params.m_query = "Petrovskoe Moscow Region";
 
     TestSearchRequest request(m_engine, params);
     request.Run();

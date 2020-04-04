@@ -14,6 +14,7 @@
 #include "indexer/brands_holder.hpp"
 #include "indexer/data_source.hpp"
 #include "indexer/feature_algo.hpp"
+#include "indexer/feature_utils.hpp"
 #include "indexer/ftypes_matcher.hpp"
 #include "indexer/search_string_utils.hpp"
 
@@ -146,9 +147,8 @@ pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const 
 
   if (type == Model::TYPE_STREET)
   {
-    auto const roadNumber = ft.GetRoadNumber();
-    if (!roadNumber.empty())
-      UpdateNameScores(roadNumber, sliceNoCategories, bestScores);
+    for (auto const & shield : feature::GetRoadShieldsNames(ft.GetRoadNumber()))
+      UpdateNameScores(shield, sliceNoCategories, bestScores);
   }
 
   return make_pair(bestScores, matchedLength);
@@ -585,7 +585,7 @@ Result Ranker::MakeResult(RankerResult const & rankerResult, bool needAddress,
     case RankerResult::Type::Building:
     {
       auto const type = rankerResult.GetBestType(m_params.m_preferredTypes);
-      return Result(r.GetID(), r.GetCenter(), name, address, type, r.GetMetadata());
+      return Result(r.GetID(), r.GetCenter(), name, address, type, r.GetDetails());
     }
     case RankerResult::Type::LatLon: return Result(r.GetCenter(), name, address);
     case RankerResult::Type::Postcode: return Result(r.GetCenter(), name);
