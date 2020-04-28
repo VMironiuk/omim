@@ -162,7 +162,7 @@ private:
 class LocalityScorerDelegate : public LocalityScorer::Delegate
 {
 public:
-  LocalityScorerDelegate(MwmContext const & context, Geocoder::Params const & params,
+  LocalityScorerDelegate(MwmContext & context, Geocoder::Params const & params,
                          base::Cancellable const & cancellable)
     : m_context(context)
     , m_params(params)
@@ -188,8 +188,24 @@ public:
 
   uint8_t GetRank(uint32_t featureId) const override { return m_ranks.Get(featureId); }
 
+  optional<m2::PointD> GetCenter(uint32_t featureId) override
+  {
+    m2::PointD center;
+    // m_context->GetCenter is faster but may not work for editor created features.
+    if (!m_context.GetCenter(featureId, center))
+    {
+      auto ft = m_context.GetFeature(featureId);
+      if (!ft)
+        return {};
+
+      center = feature::GetCenter(*ft);
+    }
+
+    return center;
+  }
+
 private:
-  MwmContext const & m_context;
+  MwmContext & m_context;
   Geocoder::Params const & m_params;
   base::Cancellable const & m_cancellable;
 
@@ -585,7 +601,7 @@ void Geocoder::GoImpl(vector<shared_ptr<MwmInfo>> const & infos, bool inViewport
       auto const mwmType = m_context->GetType();
       CHECK(mwmType, ());
       if (mwmType->m_viewportIntersected || mwmType->m_containsUserPosition ||
-          m_preRanker.Size() == 0)
+          !m_preRanker.HaveFullyMatchedResult())
       {
         MatchAroundPivot(ctx);
       }
@@ -657,7 +673,7 @@ void Geocoder::FillLocalityCandidates(BaseContext const & ctx, CBV const & filte
   }
 
   LocalityScorerDelegate delegate(*m_context, m_params, m_cancellable);
-  LocalityScorer scorer(m_params, delegate);
+  LocalityScorer scorer(m_params, m_params.m_pivot.Center(), delegate);
   scorer.GetTopLocalities(m_context->GetId(), ctx, filter, maxNumLocalities, preLocalities);
 }
 
@@ -1556,6 +1572,33 @@ void Geocoder::EmitResult(BaseContext & ctx, MwmSet::MwmId const & mwmId, uint32
                           IntersectionResult const * geoParts, bool allTokensUsed, bool exactMatch)
 {
   FeatureID id(mwmId, ftId);
+
+  double matchedFraction = 1.0;
+  // For categorial requests |allTokensUsed| == true and matchedFraction can not be calculated from |ctx|.
+  if (!allTokensUsed)
+  {
+    size_t length = 0;
+    size_t matchedLength = 0;
+    TokenSlice slice(m_params, TokenRange(0, ctx.m_numTokens));
+    for (size_t tokenIdx = 0; tokenIdx < ctx.m_numTokens; ++tokenIdx)
+    {
+      auto const tokenLength = slice.Get(tokenIdx).GetOriginal().size();
+      length += tokenLength;
+      if (ctx.IsTokenUsed(tokenIdx))
+        matchedLength += tokenLength;
+    }
+    CHECK_NOT_EQUAL(length, 0, ());
+
+    matchedFraction = static_cast<double>(matchedLength) / static_cast<double>(length);
+  }
+
+  // In our samples the least value for matched fraction for relevant result is 0.116.
+  // It is "Горнолыжный комплекс Ключи" feature for "Спортивно стрелковый комплекс Ключи
+  // Новосибирск" query. It is relevant not found result (search does not find it, but it's
+  // relevant). The least matched fraction for found relevant result is 0.241935, for found vital
+  // result is 0.269231.
+  if (matchedFraction <= 0.1)
+    return;
 
   if (ctx.m_hotelsFilter && !ctx.m_hotelsFilter->Matches(id))
     return;

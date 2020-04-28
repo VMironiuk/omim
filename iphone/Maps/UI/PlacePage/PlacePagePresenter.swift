@@ -3,9 +3,14 @@ protocol PlacePagePresenterProtocol: class {
 
   func configure()
   func setAdState(_ state: AdBannerState)
+  func updateSteps()
   func updatePreviewOffset()
   func layoutIfNeeded()
   func findNextStop(_ offset: CGFloat, velocity: CGFloat) -> PlacePageState
+  func showNextStop()
+  func showLastStop()
+  func onOffsetChanged(_ offset: CGFloat)
+  func closeAnimated()
 }
 
 class PlacePagePresenter: NSObject {
@@ -14,7 +19,7 @@ class PlacePagePresenter: NSObject {
   private let isPreviewPlus: Bool
   private let layout: IPlacePageLayout
   private var scrollSteps:[PlacePageState] = []
-
+  private var isNavigationBarVisible = false
 
   init(view: PlacePageViewProtocol,
        interactor: PlacePageInteractorProtocol,
@@ -24,6 +29,17 @@ class PlacePagePresenter: NSObject {
     self.interactor = interactor
     self.layout = layout
     self.isPreviewPlus = isPreviewPlus
+  }
+
+  private func setNavigationBarVisible(_ val: Bool) {
+    guard val != isNavigationBarVisible, let navigationBar = layout.navigationBar else { return }
+    isNavigationBarVisible = val
+    if isNavigationBarVisible {
+      view.addNavigationBar(navigationBar)
+    } else {
+      navigationBar.removeFromParent()
+      navigationBar.view.removeFromSuperview()
+    }
   }
 }
 
@@ -37,6 +53,7 @@ extension PlacePagePresenter: PlacePagePresenterProtocol {
   }
 
   func configure() {
+    view.addHeader(layout.header)
     for viewController in layout.viewControllers {
       view.addToStack(viewController)
     }
@@ -47,24 +64,32 @@ extension PlacePagePresenter: PlacePagePresenterProtocol {
     } else {
       view.hideActionBar(true)
     }
+    updatePreviewOffset()
   }
 
   func setAdState(_ state: AdBannerState) {
     layout.adState = state
   }
 
-  func updatePreviewOffset() {
+  func updateSteps() {
     layoutIfNeeded()
-    scrollSteps = layout.calculateSteps(inScrollView: view.scrollView)
-    let state = isPreviewPlus ? scrollSteps[2] : scrollSteps[1]
-    view.scrollTo(CGPoint(x: 0, y: state.offset))
+    scrollSteps = layout.calculateSteps(inScrollView: view.scrollView,
+                                        compact: view.traitCollection.verticalSizeClass == .compact)
+  }
+
+  func updatePreviewOffset() {
+    updateSteps()
+    if !view.beginDragging  {
+      let state = isPreviewPlus ? scrollSteps[2] : scrollSteps[1]
+      view.scrollTo(CGPoint(x: 0, y: state.offset))
+    }
   }
 
   func layoutIfNeeded() {
     view.layoutIfNeeded()
   }
 
-  private func findNearestStop(_ offset: CGFloat) -> PlacePageState{
+  private func findNearestStop(_ offset: CGFloat) -> PlacePageState {
     var result = scrollSteps[0]
     scrollSteps.suffix(from: 1).forEach { ppState in
       if abs(result.offset - offset) > abs(ppState.offset - offset) {
@@ -99,5 +124,29 @@ extension PlacePagePresenter: PlacePagePresenterProtocol {
     }
 
     return result
+  }
+
+  func showNextStop() {
+    if let nextStop = scrollSteps.last(where: { $0.offset > view.scrollView.contentOffset.y }) {
+      view.scrollTo(CGPoint(x: 0, y: nextStop.offset), forced: true)
+    }
+  }
+
+  func showLastStop() {
+    if let lastStop = scrollSteps.last {
+      view.scrollTo(CGPoint(x: 0, y: lastStop.offset), forced: true)
+    }
+  }
+
+  func onOffsetChanged(_ offset: CGFloat) {
+    if offset > 0 && !isNavigationBarVisible{
+      setNavigationBarVisible(true)
+    } else if offset <= 0 && isNavigationBarVisible {
+      setNavigationBarVisible(false)
+    }
+  }
+
+  func closeAnimated() {
+    view.closeAnimated()
   }
 }

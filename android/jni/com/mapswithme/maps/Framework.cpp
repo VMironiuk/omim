@@ -1,10 +1,12 @@
 #include "com/mapswithme/maps/Framework.hpp"
+
 #include "com/mapswithme/core/jni_helper.hpp"
+#include "com/mapswithme/maps/guides/Guides.hpp"
 #include "com/mapswithme/maps/UserMarkHelper.hpp"
 #include "com/mapswithme/opengl/androidoglcontextfactory.hpp"
 #include "com/mapswithme/platform/Platform.hpp"
-#include "com/mapswithme/util/NetworkPolicy.hpp"
 #include "com/mapswithme/util/FeatureIdBuilder.hpp"
+#include "com/mapswithme/util/NetworkPolicy.hpp"
 #include "com/mapswithme/vulkan/android_vulkan_context_factory.hpp"
 
 #include "map/chart_generator.hpp"
@@ -1034,8 +1036,16 @@ Java_com_mapswithme_maps_Framework_nativePlacePageActivationListener(JNIEnv *env
     jni::TScopedLocalRef placePageDataRef(env, nullptr);
     if (info.IsTrack())
     {
+      auto const categoryId = info.GetBookmarkCategoryId();
+      auto const serverId = frm()->GetBookmarkManager().GetCategoryServerId(categoryId);
       auto const elevationInfo = frm()->GetBookmarkManager().MakeElevationInfo(info.GetTrackId());
-      placePageDataRef.reset(usermark_helper::CreateElevationInfo(env, elevationInfo));
+      placePageDataRef.reset(usermark_helper::CreateElevationInfo(env, serverId, elevationInfo));
+    }
+    else if (info.IsGuide())
+    {
+      auto const & guidesManager = frm()->GetGuidesManager();
+      auto const gallery = guidesManager.GetGallery();
+      placePageDataRef.reset(guides::CreateGallery(env, gallery));
     }
     else
     {

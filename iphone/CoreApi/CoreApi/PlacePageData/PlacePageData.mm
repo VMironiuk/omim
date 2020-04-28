@@ -77,7 +77,6 @@ static PlacePageRoadType convertRoadType(RoadWarningMarkType roadType) {
   self = [super init];
   if (self) {
     _buttonsData = [[PlacePageButtonsData alloc] initWithRawData:rawData()];
-    _previewData = [[PlacePagePreviewData alloc] initWithRawData:rawData()];
     _infoData = [[PlacePageInfoData alloc] initWithRawData:rawData() ohLocalization:localization];
 
     if (rawData().IsBookmark()) {
@@ -132,15 +131,33 @@ static PlacePageRoadType convertRoadType(RoadWarningMarkType roadType) {
       _sponsoredDeeplink = @(rawData().GetSponsoredDeepLink().c_str());
     }
 
-    _mapNodeAttributes = [[MWMStorage sharedStorage] attributesForCountry:@(rawData().GetCountryId().c_str())];
-    [[MWMStorage sharedStorage] addObserver:self];
-//    _elevationProfileData = [[ElevationProfileData alloc] init];
+    if (rawData().IsTrack()) {
+      auto const &bm = GetFramework().GetBookmarkManager();
+      auto const &trackId = rawData().GetTrackId();
+      auto const &elevationInfo = bm.MakeElevationInfo(trackId);
+      auto const &serverId = bm.GetCategoryServerId(rawData().GetBookmarkCategoryId());
+      _elevationProfileData = [[ElevationProfileData alloc] initWithElevationInfo:elevationInfo
+                                                                         serverId:@(serverId.c_str())
+                                                                      activePoint:bm.GetElevationActivePoint(trackId)
+                                                                       myPosition:bm.GetElevationMyPosition(trackId)];
+      _previewData = [[PlacePagePreviewData alloc] initWithElevationInfo:elevationInfo];
+    } else {
+      _previewData = [[PlacePagePreviewData alloc] initWithRawData:rawData()];
+    }
+
+    auto const &countryId = rawData().GetCountryId();
+    if (!countryId.empty()) {
+      _mapNodeAttributes = [[MWMStorage sharedStorage] attributesForCountry:@(rawData().GetCountryId().c_str())];
+      [[MWMStorage sharedStorage] addObserver:self];
+    }
   }
   return self;
 }
 
 - (void)dealloc {
-  [[MWMStorage sharedStorage] removeObserver:self];
+  if (self.mapNodeAttributes != nil) {
+    [[MWMStorage sharedStorage] removeObserver:self];
+  }
 }
 
 - (void)loadOnlineDataWithCompletion:(MWMVoidBlock)completion {
@@ -281,6 +298,20 @@ static PlacePageRoadType convertRoadType(RoadWarningMarkType roadType) {
   if (self.onBookmarkStatusUpdate != nil) {
     self.onBookmarkStatusUpdate();
   }
+}
+
+- (void)updateUgcStatus {
+  if (!GetFramework().HasPlacePageInfo()) {
+    return;
+  }
+
+  __weak __typeof(self) wSelf = self;
+  [self loadUgcWithCompletion:^{
+    __strong __typeof(wSelf) self = wSelf;
+    if (self.onUgcStatusUpdate != nil) {
+      self.onUgcStatusUpdate();
+    }
+  }];
 }
 
 #pragma mark - MWMStorageObserver

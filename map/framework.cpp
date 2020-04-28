@@ -6,6 +6,7 @@
 #include "map/download_on_map_ads_delegate.hpp"
 #include "map/everywhere_search_params.hpp"
 #include "map/gps_tracker.hpp"
+#include "map/guides_on_map_delegate.hpp"
 #include "map/notifications/notification_manager_delegate.hpp"
 #include "map/notifications/notification_queue.hpp"
 #include "map/promo_catalog_poi_checker.hpp"
@@ -143,6 +144,7 @@ char const kAllowAutoZoom[] = "AutoZoom";
 char const kTrafficEnabledKey[] = "TrafficEnabled";
 char const kTransitSchemeEnabledKey[] = "TransitSchemeEnabled";
 char const kIsolinesEnabledKey[] = "IsolinesEnabled";
+char const kGuidesEnabledKey[] = "GuidesEnabledKey";
 char const kTrafficSimplifiedColorsKey[] = "TrafficSimplifiedColors";
 char const kLargeFontsSize[] = "LargeFontsSize";
 char const kTranslitMode[] = "TransliterationMode";
@@ -324,6 +326,11 @@ IsolinesManager const & Framework::GetIsolinesManager() const
   return m_isolinesManager;
 }
 
+GuidesManager & Framework::GetGuidesManager()
+{
+  return m_guidesManager;
+}
+
 void Framework::OnUserPositionChanged(m2::PointD const & position, bool hasPosition)
 {
   GetBookmarkManager().MyPositionMark().SetUserPosition(position, hasPosition);
@@ -354,6 +361,7 @@ void Framework::OnViewportChanged(ScreenBase const & screen)
   m_localAdsManager.UpdateViewport(m_currentModelView);
   m_transitManager.UpdateViewport(m_currentModelView);
   m_isolinesManager.UpdateViewport(m_currentModelView);
+  m_guidesManager.UpdateViewport(m_currentModelView);
 
   if (m_viewportChangedFn != nullptr)
     m_viewportChangedFn(screen);
@@ -517,6 +525,8 @@ Framework::Framework(FrameworkParams const & params)
 
   m_isolinesManager.SetEnabled(LoadIsolinesEnabled());
 
+  m_guidesManager.SetEnabled(LoadGuidesEnabled());
+
   m_adsEngine = make_unique<ads::Engine>(
       make_unique<ads::DownloadOnMapDelegate>(*m_infoGetter, m_storage, *m_promoApi, *m_purchase));
 
@@ -542,6 +552,8 @@ Framework::Framework(FrameworkParams const & params)
   m_promoApi->SetDelegate(make_unique<PromoDelegate>(m_featuresFetcher.GetDataSource(),
                           *m_cityFinder, catalogHeadersProvider));
   eye::Eye::Instance().Subscribe(m_promoApi.get());
+
+  m_guidesManager.SetApiDelegate(make_unique<GuidesOnMapDelegate>(catalogHeadersProvider));
 
   // Clean the no longer used key from old devices.
   // Remove this line after April 2020 (assuming the majority of devices
@@ -1116,6 +1128,9 @@ void Framework::ShowBookmark(Bookmark const * mark)
   if (scale == 0)
     scale = scales::GetUpperComfortScale();
 
+  auto es = GetBookmarkManager().GetEditSession();
+  es.SetIsVisible(mark->GetGroupId(), true /* visible */);
+
   if (m_drapeEngine != nullptr)
   {
     m_drapeEngine->SetModelViewCenter(mark->GetPivot(), scale, true /* isAnim */,
@@ -1127,7 +1142,8 @@ void Framework::ShowBookmark(Bookmark const * mark)
 
 void Framework::ShowTrack(kml::TrackId trackId)
 {
-  auto const track = GetBookmarkManager().GetTrack(trackId);
+  auto & bm = GetBookmarkManager();
+  auto const track = bm.GetTrack(trackId);
   if (track == nullptr)
     return;
 
@@ -1137,12 +1153,17 @@ void Framework::ShowTrack(kml::TrackId trackId)
   StopLocationFollow();
   ShowRect(rect);
 
-  GetBookmarkManager().ShowDefaultTrackInfo(trackId);
+  auto es = GetBookmarkManager().GetEditSession();
+  es.SetIsVisible(track->GetGroupId(), true /* visible */);
+
+  if (track->IsInteractive())
+    bm.SetDefaultTrackSelection(trackId, true /* showInfoSign */);
 }
 
 void Framework::ShowBookmarkCategory(kml::MarkGroupId categoryId, bool animation)
 {
-  auto rect = GetBookmarkManager().GetCategoryRect(categoryId);
+  auto & bm = GetBookmarkManager();
+  auto rect = bm.GetCategoryRect(categoryId);
   if (!rect.IsValid())
     return;
 
@@ -1150,6 +1171,18 @@ void Framework::ShowBookmarkCategory(kml::MarkGroupId categoryId, bool animation
 
   StopLocationFollow();
   ShowRect(rect, -1 /* maxScale */, animation);
+
+  auto es = bm.GetEditSession();
+  es.SetIsVisible(categoryId, true /* visible */);
+
+  auto const trackIds = bm.GetTrackIds(categoryId);
+  for (auto trackId : trackIds)
+  {
+    if (!bm.GetTrack(trackId)->IsInteractive())
+      continue;
+    bm.SetDefaultTrackSelection(trackId, true /* showInfoSign */);
+    break;
+  }
 }
 
 void Framework::ShowFeature(FeatureID const & featureId)
@@ -2000,6 +2033,7 @@ void Framework::OnRecoverSurface(int width, int height, bool recreateContextDepe
   m_trafficManager.OnRecoverSurface();
   m_transitManager.Invalidate();
   m_isolinesManager.Invalidate();
+  m_guidesManager.Invalidate();
   m_localAdsManager.Invalidate();
 }
 
@@ -2379,6 +2413,11 @@ void Framework::ActivateMapSelection(std::optional<place_page::Info> const & inf
   if (!info)
     return;
 
+  if (info->GetSelectedObject() == df::SelectionShape::OBJECT_TRACK)
+    GetBookmarkManager().OnTrackSelected(info->GetTrackId());
+  else
+    GetBookmarkManager().OnTrackDeselected();
+
   CHECK_NOT_EQUAL(info->GetSelectedObject(), df::SelectionShape::OBJECT_EMPTY, ("Empty selections are impossible."));
   if (m_drapeEngine != nullptr)
   {
@@ -2405,8 +2444,12 @@ void Framework::DeactivateMapSelection(bool notifyUI)
 
   m_currentPlacePageInfo = {};
 
-  if (somethingWasAlreadySelected && m_drapeEngine != nullptr)
-    m_drapeEngine->DeselectObject();
+  if (somethingWasAlreadySelected)
+  {
+    GetBookmarkManager().OnTrackDeselected();
+    if (m_drapeEngine != nullptr)
+      m_drapeEngine->DeselectObject();
+  }
 
   SetDisplacementMode(DisplacementModeManager::SLOT_MAP_SELECTION, false /* show */);
 }
@@ -2496,7 +2539,15 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
     if (m_currentPlacePageInfo->GetTrackId() != kml::kInvalidTrackId)
     {
       if (m_currentPlacePageInfo->GetTrackId() == prevTrackId)
+      {
+        if (m_drapeEngine)
+        {
+          m_drapeEngine->SelectObject(df::SelectionShape::ESelectedObject::OBJECT_TRACK,
+                                      m_currentPlacePageInfo->GetMercator(), FeatureID(),
+                                      false /* isAnim */, false /* isGeometrySelectionAllowed */);
+        }
         return;
+      }
       GetBookmarkManager().UpdateElevationMyPosition(m_currentPlacePageInfo->GetTrackId());
     }
 
@@ -2555,8 +2606,7 @@ void Framework::BuildTrackPlacePage(BookmarkManager::TrackSelectionInfo const & 
   info.SetSelectedObject(df::SelectionShape::OBJECT_TRACK);
   auto const & track = *GetBookmarkManager().GetTrack(trackSelectionInfo.m_trackId);
   FillTrackInfo(track, trackSelectionInfo.m_trackPoint, info);
-  GetBookmarkManager().SelectTrack(trackSelectionInfo, true /* notifyListeners */);
-  GetBookmarkManager().HideTrackInfo(trackSelectionInfo.m_trackId);
+  GetBookmarkManager().SetTrackSelectionInfo(trackSelectionInfo, true /* notifyListeners */);
 }
 
 std::optional<place_page::Info> Framework::BuildPlacePageInfo(
@@ -2703,6 +2753,8 @@ BookmarkManager::TrackSelectionInfo Framework::FindTrackInTapPosition(
   auto const & bm = GetBookmarkManager();
   if (buildInfo.m_trackId != kml::kInvalidTrackId)
   {
+    if (bm.GetTrack(buildInfo.m_trackId) == nullptr)
+      return {};
     auto const selection = bm.GetTrackSelectionInfo(buildInfo.m_trackId);
     CHECK_NOT_EQUAL(selection.m_trackId, kml::kInvalidTrackId, ());
     return selection;
@@ -2730,7 +2782,7 @@ UserMark const * Framework::FindUserMarkInTapPosition(place_page::BuildInfo cons
       if (buildInfo.m_source != place_page::BuildInfo::Source::User)
         return df::TapInfo::GetPreciseSearchRect(buildInfo.m_mercator, kEps);
 
-      if (type == UserMark::Type::BOOKMARK)
+      if (type == UserMark::Type::BOOKMARK || type == UserMark::Type::TRACK_INFO)
         return df::TapInfo::GetBookmarkSearchRect(buildInfo.m_mercator, m_currentModelView);
 
       if (type == UserMark::Type::ROUTING || type == UserMark::Type::ROAD_WARNING)
@@ -2738,7 +2790,10 @@ UserMark const * Framework::FindUserMarkInTapPosition(place_page::BuildInfo cons
 
       return df::TapInfo::GetDefaultSearchRect(buildInfo.m_mercator, m_currentModelView);
     },
-    [](UserMark::Type) { return false; });
+    [](UserMark::Type type)
+    {
+      return type == UserMark::Type::TRACK_INFO || type == UserMark::Type::TRACK_SELECTION;
+    });
   return mark;
 }
 
@@ -2965,6 +3020,19 @@ bool Framework::LoadIsolinesEnabled()
 void Framework::SaveIsolonesEnabled(bool enabled)
 {
   settings::Set(kIsolinesEnabledKey, enabled);
+}
+
+bool Framework::LoadGuidesEnabled()
+{
+  bool enabled;
+  if (!settings::Get(kGuidesEnabledKey, enabled))
+    enabled = false;
+  return enabled;
+}
+
+void Framework::SaveGuidesEnabled(bool guidesEnabled)
+{
+  settings::Set(kGuidesEnabledKey, guidesEnabled);
 }
 
 void Framework::EnableChoosePositionMode(bool enable, bool enableBounds, bool applyPosition,

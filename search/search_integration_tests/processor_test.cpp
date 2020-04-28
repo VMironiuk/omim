@@ -2765,5 +2765,100 @@ UNIT_CLASS_TEST(ProcessorTest, FilterVillages)
     TEST(ResultsMatch(request.Results(), rules), ());
   }
 }
+
+UNIT_CLASS_TEST(ProcessorTest, MatchedFraction)
+{
+  string const countryName = "Wonderland";
+  string const streetName = "Октябрьский проспaект";
+
+  TestStreet street1(vector<m2::PointD>{m2::PointD(-1.0, -1.0), m2::PointD(1.0, 1.0)},
+                     "Первомайская", "ru");
+  TestStreet street2(vector<m2::PointD>{m2::PointD(-1.0, 1.0), m2::PointD(1.0, -1.0)},
+                     "8 марта", "ru");
+
+  auto countryId = BuildCountry(countryName, [&](TestMwmBuilder & builder) {
+    builder.Add(street1);
+    builder.Add(street2);
+  });
+
+  SetViewport(m2::RectD(-1.0, -1.0, 1.0, 1.0));
+  {
+    // |8 марта| should not match because matched fraction is too low (1/13 <= 0.1).
+    Rules rules = {ExactMatch(countryId, street1)};
+    TEST(ResultsMatch("первомайская 8 ", rules), ());
+  }
+  {
+    Rules rules = {ExactMatch(countryId, street2)};
+    TEST(ResultsMatch("8 ", rules), ());
+  }
+}
+
+UNIT_CLASS_TEST(ProcessorTest, AvoidMatchAroundPivotInMwmWithCity)
+{
+  string const minskCountryName = "Minsk";
+
+  TestCity minsk(m2::PointD(-10.0, -10.0), "Minsk", "en", 10 /* rank */);
+  // World.mwm should intersect viewport.
+  TestPOI dummy(m2::PointD(10.0, 10.0), "", "en");
+
+  auto worldId = BuildWorld([&](TestMwmBuilder & builder) {
+    builder.Add(minsk);
+    builder.Add(dummy);
+  });
+
+  TestCafe minskCafe(m2::PointD(-9.99, -9.99), "Minsk cafe", "en");
+  auto minskId = BuildCountry(minskCountryName, [&](TestMwmBuilder & builder) {
+    builder.Add(minsk);
+    builder.Add(minskCafe);
+  });
+
+  SetViewport(m2::RectD(m2::PointD(-1.0, -1.0), m2::PointD(1.0, 1.0)));
+  {
+    // Minsk cafe should not appear here because we have (worldId, minsk) result with all tokens
+    // used.
+    Rules rules = {ExactMatch(worldId, minsk)};
+    TEST(ResultsMatch("Minsk ", rules), ());
+    TEST(ResultsMatch("Minsk", rules), ());
+  }
+  {
+    // We search for pois until we find result with all tokens used. We do not emit relaxed result
+    // from world.
+    Rules rules = {ExactMatch(minskId, minskCafe)};
+    TEST(ResultsMatch("Minsk cafe", rules), ());
+  }
+}
+
+UNIT_CLASS_TEST(ProcessorTest, LocalityScorer)
+{
+  TestCity sp0(m2::PointD(0.0, 0.0), "San Pedro", "en", 50 /* rank */);
+  TestCity sp1(m2::PointD(1.0, 1.0), "San Pedro", "en", 50 /* rank */);
+  TestCity sp2(m2::PointD(2.0, 2.0), "San Pedro", "en", 50 /* rank */);
+  TestCity sp3(m2::PointD(3.0, 3.0), "San Pedro", "en", 50 /* rank */);
+  TestCity sp4(m2::PointD(4.0, 4.0), "San Pedro", "en", 50 /* rank */);
+  TestCity spAtacama(m2::PointD(5.5, 5.5), "San Pedro de Atacama", "en", 100 /* rank */);
+  TestCity spAlcantara(m2::PointD(6.5, 6.5), "San Pedro de Alcantara", "en", 40 /* rank */);
+
+  auto worldId = BuildWorld([&](TestMwmBuilder & builder) {
+    builder.Add(sp0);
+    builder.Add(sp1);
+    builder.Add(sp2);
+    builder.Add(sp3);
+    builder.Add(sp4);
+    builder.Add(spAtacama);
+    builder.Add(spAlcantara);
+  });
+
+  SetViewport(m2::RectD(m2::PointD(0.0, 0.0), m2::PointD(2.0, 2.0)));
+  {
+    Rules rules = {ExactMatch(worldId, spAtacama)};
+    TEST(ResultsMatch("San Pedro de Atacama ", rules), ());
+  }
+  {
+    // spAlcantara has the same cosine similarity as sp0..sp4 and lower rank but
+    // more matched tokens.
+    Rules rules = {ExactMatch(worldId, spAlcantara)};
+    TEST(ResultsMatch("San Pedro de Alcantara ", rules), ());
+  }
+}
 }  // namespace
 }  // namespace search

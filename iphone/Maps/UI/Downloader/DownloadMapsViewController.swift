@@ -21,7 +21,6 @@ class DownloadMapsViewController: MWMViewController {
 
   @IBOutlet var tableView: UITableView!
   @IBOutlet var allMapsView: UIView!
-  @IBOutlet var allMapsViewBottomOffset: NSLayoutConstraint!
   @IBOutlet var allMapsButton: UIButton!
   @IBOutlet var allMapsCancelButton: UIButton!
   @IBOutlet var searchBar: UISearchBar!
@@ -35,6 +34,7 @@ class DownloadMapsViewController: MWMViewController {
   @objc var mode: MWMMapDownloaderMode = .downloaded
   private var skipCountryEvent = false
   private var hasAddMapSection: Bool { dataSource.isRoot && mode == .downloaded }
+  private let allMapsViewBottomOffsetConstant: CGFloat = 60
 
   lazy var noSerchResultViewController: SearchNoResultsViewController = {
     let vc = storyboard!.instantiateViewController(ofType: SearchNoResultsViewController.self)
@@ -87,11 +87,13 @@ class DownloadMapsViewController: MWMViewController {
     navigationController?.pushViewController(vc, animated: true)
   }
 
-  fileprivate func showActions(_ nodeAttrs: MapNodeAttributes) {
+  fileprivate func showActions(_ nodeAttrs: MapNodeAttributes, in cell: UITableViewCell) {
     let menuTitle = nodeAttrs.nodeName
     let multiparent = nodeAttrs.parentInfo.count > 1
     let message = dataSource.isRoot || multiparent ? nil : nodeAttrs.parentInfo.first?.countryName
     let actionSheet = UIAlertController(title: menuTitle, message: message, preferredStyle: .actionSheet)
+    actionSheet.popoverPresentationController?.sourceView = cell
+    actionSheet.popoverPresentationController?.sourceRect = cell.bounds
 
     let actions: [NodeAction]
     switch nodeAttrs.nodeStatus {
@@ -172,6 +174,11 @@ class DownloadMapsViewController: MWMViewController {
       allMapsButton.isHidden = true
       allMapsCancelButton.isHidden = false
       allMapsCancelButton.setTitle(buttonTitle, for: .normal)
+    }
+    if !allMapsView.isHidden {
+      tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: allMapsViewBottomOffsetConstant, right: 0)
+    } else {
+      tableView.contentInset = UIEdgeInsets.zero
     }
   }
 
@@ -329,7 +336,7 @@ extension DownloadMapsViewController: UITableViewDelegate {
       showChildren(dataSource.item(at: indexPath))
       return
     }
-    showActions(nodeAttrs)
+    showActions(nodeAttrs, in: tableView.cellForRow(at: indexPath)!)
   }
 }
 
@@ -376,7 +383,7 @@ extension DownloadMapsViewController: MWMMapDownloaderTableViewCellDelegate {
   func mapDownloaderCellDidLongPress(_ cell: MWMMapDownloaderTableViewCell) {
     guard let indexPath = tableView.indexPath(for: cell) else { return }
     let nodeAttrs = dataSource.item(at: indexPath)
-    showActions(nodeAttrs)
+    showActions(nodeAttrs, in: cell)
   }
 }
 

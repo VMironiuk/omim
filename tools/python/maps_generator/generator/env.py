@@ -225,11 +225,11 @@ class PathProvider:
 
     @property
     def packed_polygons_path(self) -> AnyStr:
-        return os.path.join(self.intermediate_data_path, "packed_polygons.bin")
+        return os.path.join(self.mwm_path, "packed_polygons.bin")
 
     @property
     def localads_path(self) -> AnyStr:
-        return os.path.join(self.intermediate_data_path, f"localads_{self.mwm_version}")
+        return os.path.join(self.build_path, f"localads_{self.mwm_version}")
 
     @property
     def types_path(self) -> AnyStr:
@@ -348,6 +348,7 @@ class Env:
         build_name: Optional[AnyStr] = None,
         build_suffix: AnyStr = "",
         skipped_stages: Optional[Set[Type[Stage]]] = None,
+        force_download_files: bool = False
     ):
         self.setup_logging()
 
@@ -359,6 +360,7 @@ class Env:
         self.gen_tool = self.setup_generator_tool()
 
         self.production = production
+        self.force_download_files = force_download_files
         self.countries = countries
         self.skipped_stages = set() if skipped_stages is None else skipped_stages
         if self.countries is None:
@@ -375,7 +377,11 @@ class Env:
             if build_suffix:
                 build_name = f"{build_name}{suffix_div}{build_suffix}"
         else:
-            date_str, build_suffix = build_name.split(suffix_div, maxsplit=1)
+            s = build_name.split(suffix_div, maxsplit=1)
+            if len(s) == 1:
+                s.append("")
+
+            date_str, build_suffix = s
             dt = datetime.datetime.strptime(date_str, version_format)
 
         self.build_suffix = build_suffix

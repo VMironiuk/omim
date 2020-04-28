@@ -1,5 +1,6 @@
 #include "generator/place_processor.hpp"
 
+#include "generator/cluster_finder.hpp"
 #include "generator/feature_maker_base.hpp"
 #include "generator/type_helper.hpp"
 
@@ -7,6 +8,7 @@
 #include "indexer/ftypes_matcher.hpp"
 
 #include "base/assert.hpp"
+#include "base/stl_helpers.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -201,8 +203,9 @@ std::vector<PlaceProcessor::PlaceWithIds> PlaceProcessor::ProcessPlaces()
       }
       std::vector<base::GeoObjectId> ids;
       ids.reserve(cluster.size());
-      std::transform(std::cbegin(cluster), std::cend(cluster), std::back_inserter(ids),
-                     [](auto const & place) { return place.GetMostGenericOsmId(); });
+      base::Transform(cluster, std::back_inserter(ids), [](auto const & place) {
+        return place.GetMostGenericOsmId();
+      });
       finalPlaces.emplace_back(std::move(bestFb), std::move(ids));
       if (m_boundariesTable)
         FillTable(std::cbegin(cluster), std::cend(cluster), best);

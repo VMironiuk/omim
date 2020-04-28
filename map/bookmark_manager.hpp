@@ -485,11 +485,10 @@ public:
                                       TracksFilter const & tracksFilter = nullptr) const;
   TrackSelectionInfo GetTrackSelectionInfo(kml::TrackId const & trackId) const;
 
-  void SelectTrack(TrackSelectionInfo const & trackSelectionInfo, bool notifyListeners);
-  void DeselectTrack(kml::TrackId trackId);
-
-  void ShowDefaultTrackInfo(kml::TrackId trackId);
-  void HideTrackInfo(kml::TrackId trackId);
+  void SetTrackSelectionInfo(TrackSelectionInfo const & trackSelectionInfo, bool notifyListeners);
+  void SetDefaultTrackSelection(kml::TrackId trackId, bool showInfoSign);
+  void OnTrackSelected(kml::TrackId trackId);
+  void OnTrackDeselected();
 
 private:
   class MarksChangesTracker : public df::UserMarksProvider
@@ -762,6 +761,15 @@ private:
   std::vector<std::string> GetAllPaidCategoriesIds() const;
 
   kml::MarkId GetTrackSelectionMarkId(kml::TrackId trackId) const;
+  int GetTrackSelectionMarkMinZoom(kml::TrackId trackId) const;
+  void SetTrackSelectionMark(kml::TrackId trackId, m2::PointD const & pt, double distance);
+  void DeleteTrackSelectionMark(kml::TrackId trackId);
+  void SetTrackInfoMark(kml::TrackId trackId, m2::PointD const & pt);
+  void ResetTrackInfoMark(kml::TrackId trackId);
+
+  void UpdateTrackMarksMinZoom();
+  void UpdateTrackMarksVisibility(kml::MarkGroupId groupId);
+  void RequestSymbolSizes();
 
   ThreadChecker m_threadChecker;
 
@@ -808,6 +816,7 @@ private:
   MyPositionMarkPoint * m_myPositionMark = nullptr;
 
   kml::MarkId m_trackInfoMarkId = kml::kInvalidMarkId;
+  kml::TrackId m_selectedTrackId = kml::kInvalidTrackId;
   m2::PointF m_maxBookmarkSymbolSize;
 
   bool m_asyncLoadingInProgress = false;

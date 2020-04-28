@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^LoadTagsCompletionBlock)(NSArray<MWMTagGroup *> * _Nullable tags, NSInteger maxTagsNumber);
 typedef void (^PingCompletionBlock)(BOOL success);
+typedef void (^ElevationPointChangedBlock)(double distance);
 
 @interface MWMBookmarksManager : NSObject
 
@@ -118,6 +119,12 @@ typedef void (^PingCompletionBlock)(BOOL success);
 - (NSString *)getGuidesIds;
 - (NSString *)deviceId;
 - (NSDictionary<NSString *, NSString *> *)getCatalogHeaders;
+
+- (void)setElevationActivePoint:(double)distance trackId:(uint64_t)trackId;
+- (void)setElevationActivePointChanged:(uint64_t)trackId callback:(ElevationPointChangedBlock)callback;
+- (void)resetElevationActivePointChanged;
+- (void)setElevationMyPositionChanged:(uint64_t)trackId callback:(ElevationPointChangedBlock)callback;
+- (void)resetElevationMyPositionChanged;
 
 @end
 NS_ASSUME_NONNULL_END

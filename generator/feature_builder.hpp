@@ -70,7 +70,7 @@ public:
   size_t GetTypesCount() const { return m_params.m_types.size(); }
 
   template <class ToDo>
-  void ForEachGeometryPointEx(ToDo && toDo) const
+  void ForEachPoint(ToDo && toDo) const
   {
     if (IsPoint())
     {
@@ -78,48 +78,34 @@ public:
     }
     else
     {
-      for (PointSeq const & points : m_polygons)
+      for (auto const & points : m_polygons)
       {
         for (auto const & pt : points)
-        {
-          if (!toDo(pt))
-            return;
-        }
-        toDo.EndRegion();
+          toDo(pt);
       }
     }
   }
 
   template <class ToDo>
-  void ForEachGeometryPoint(ToDo && toDo) const
-  {
-    ToDoWrapper<ToDo> wrapper(std::forward<ToDo>(toDo));
-    ForEachGeometryPointEx(std::move(wrapper));
-  }
-
-  template <class ToDo>
-  bool ForAnyGeometryPointEx(ToDo && toDo) const
+  bool ForAnyPoint(ToDo && toDo) const
   {
     if (IsPoint())
       return toDo(m_center);
 
-    for (PointSeq const & points : m_polygons)
+    for (auto const & points : m_polygons)
     {
-      for (auto const & pt : points)
-      {
-        if (toDo(pt))
-          return true;
-      }
-      toDo.EndRegion();
+      if (base::AnyOf(points, std::forward<ToDo>(toDo)))
+        return true;
     }
+
     return false;
   }
 
   template <class ToDo>
-  bool ForAnyGeometryPoint(ToDo && toDo) const
+  void ForEachPolygon(ToDo && toDo) const
   {
-    ToDoWrapper<ToDo> wrapper(std::forward<ToDo>(toDo));
-    return ForAnyGeometryPointEx(std::move(wrapper));
+    for (auto const & points : m_polygons)
+      toDo(points);
   }
 
   // To work with geometry type.
@@ -210,18 +196,6 @@ public:
   bool IsCoastCell() const { return (m_coastCell != -1); }
 
 protected:
-  template <class ToDo>
-  class ToDoWrapper
-  {
-  public:
-    ToDoWrapper(ToDo && toDo) : m_toDo(std::forward<ToDo>(toDo)) {}
-    bool operator()(m2::PointD const & p) { return m_toDo(p); }
-    void EndRegion() {}
-
-  private:
-    ToDo && m_toDo;
-  };
-
   // Can be one of the following:
   // - point in point-feature
   // - origin point of text [future] in line-feature
@@ -311,9 +285,9 @@ void ReadFromSourceRawFormat(Source & src, FeatureBuilder & fb)
   SerializationPolicy::Deserialize(fb, buffer);
 }
 
-// Process features in .dat file.
+// Process features in features file.
 template <class SerializationPolicy = serialization_policy::MinSize, class ToDo>
-void ForEachFromDatRawFormat(std::string const & filename, ToDo && toDo)
+void ForEachFeatureRawFormat(std::string const & filename, ToDo && toDo)
 {
   FileReader reader(filename);
   ReaderSource<FileReader> src(reader);
@@ -330,53 +304,11 @@ void ForEachFromDatRawFormat(std::string const & filename, ToDo && toDo)
   }
 }
 
-/// Parallel process features in .dat file.
-template <class SerializationPolicy = serialization_policy::MinSize, class ToDo>
-void ForEachParallelFromDatRawFormat(size_t threadsCount, std::string const & filename,
-                                     ToDo && toDo)
-{
-  CHECK_GREATER_OR_EQUAL(threadsCount, 1, ());
-  if (threadsCount == 1)
-    return ForEachFromDatRawFormat(filename, std::forward<ToDo>(toDo));
-
-  FileReader reader(filename);
-  ReaderSource<FileReader> src(reader);
-  //  TryReadAndCheckVersion<SerializationPolicy>(src);
-  auto const fileSize = reader.Size();
-  auto currPos = src.Pos();
-  std::mutex readMutex;
-  auto concurrentProcessor = [&] {
-    for (;;)
-    {
-      FeatureBuilder fb;
-      uint64_t featurePos;
-
-      {
-        std::lock_guard<std::mutex> lock(readMutex);
-
-        if (fileSize <= currPos)
-          break;
-
-        ReadFromSourceRawFormat<SerializationPolicy>(src, fb);
-        featurePos = currPos;
-        currPos = src.Pos();
-      }
-
-      toDo(fb, featurePos);
-    }
-  };
-
-  std::vector<std::thread> workers;
-  for (size_t i = 0; i < threadsCount; ++i)
-    workers.emplace_back(concurrentProcessor);
-  for (auto & thread : workers)
-    thread.join();
-}
 template <class SerializationPolicy = serialization_policy::MinSize>
 std::vector<FeatureBuilder> ReadAllDatRawFormat(std::string const & fileName)
 {
   std::vector<FeatureBuilder> fbs;
-  ForEachFromDatRawFormat<SerializationPolicy>(fileName, [&](auto && fb, auto const &) {
+  ForEachFeatureRawFormat<SerializationPolicy>(fileName, [&](auto && fb, auto const &) {
     fbs.emplace_back(std::move(fb));
   });
   return fbs;

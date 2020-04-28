@@ -12,10 +12,12 @@
 #include "routing/speed_camera_prohibition.hpp"
 
 #include "indexer/classificator.hpp"
+#include "indexer/dat_section_header.hpp"
 #include "indexer/feature_algo.hpp"
 #include "indexer/feature_impl.hpp"
 #include "indexer/feature_processor.hpp"
 #include "indexer/feature_visibility.hpp"
+#include "indexer/meta_idx.hpp"
 #include "indexer/scales.hpp"
 #include "indexer/scales_patch.hpp"
 
@@ -26,6 +28,7 @@
 #include "coding/files_container.hpp"
 #include "coding/internal/file_data.hpp"
 #include "coding/point_coding.hpp"
+#include "coding/succinct_mapper.hpp"
 
 #include "geometry/polygon.hpp"
 
@@ -51,7 +54,7 @@ class FeaturesCollector2 : public FeaturesCollector
 public:
   FeaturesCollector2(string const & filename, DataHeader const & header,
                      RegionData const & regionData, uint32_t versionDate)
-    : FeaturesCollector(filename + DATA_FILE_TAG)
+    : FeaturesCollector(filename + FEATURES_FILE_TAG)
     , m_filename(filename)
     , m_header(header)
     , m_regionData(regionData)
@@ -71,7 +74,7 @@ public:
   ~FeaturesCollector2()
   {
     // Check file size.
-    auto const unused = CheckedFilePosCast(m_datFile);
+    auto const unused = CheckedFilePosCast(m_dataFile);
     UNUSED_VALUE(unused);
   }
 
@@ -104,7 +107,27 @@ public:
 
     {
       FilesContainerW writer(m_filename, FileWriter::OP_WRITE_EXISTING);
-      writer.Write(m_datFile.GetName(), DATA_FILE_TAG);
+      auto w = writer.GetWriter(FEATURES_FILE_TAG);
+
+      size_t const startOffset = w->Pos();
+      CHECK(coding::IsAlign8(startOffset), ());
+
+      feature::DatSectionHeader header;
+      header.Serialize(*w);
+
+      uint64_t bytesWritten = static_cast<uint64_t>(w->Pos());
+      coding::WritePadding(*w, bytesWritten);
+
+      header.m_featuresOffset = base::asserted_cast<uint32_t>(w->Pos() - startOffset);
+      ReaderSource<ModelReaderPtr> src(make_unique<FileReader>(m_dataFile.GetName()));
+      rw::ReadAndWrite(src, *w);
+      header.m_featuresSize =
+          base::asserted_cast<uint32_t>(w->Pos() - header.m_featuresOffset - startOffset);
+
+      auto const endOffset = w->Pos();
+      w->Seek(startOffset);
+      header.Serialize(*w);
+      w->Seek(endOffset);
     }
 
     // File Writer finalization function with adding section to the main mwm file.
@@ -128,12 +151,11 @@ public:
       FilesContainerW writer(m_filename, FileWriter::OP_WRITE_EXISTING);
       auto w = writer.GetWriter(METADATA_INDEX_FILE_TAG);
 
-      /// @todo Replace this mapping vector with succint structure.
+      MetadataIndexBuilder metaIdxBuilder;
       for (auto const & v : m_metadataOffset)
-      {
-        WriteToSink(*w, v.first);
-        WriteToSink(*w, v.second);
-      }
+        metaIdxBuilder.Put(v.first, v.second);
+
+      metaIdxBuilder.Freeze(*w);
     }
 
     if (m_header.GetType() == DataHeader::MapType::Country ||
@@ -315,11 +337,11 @@ bool GenerateFinalFeatures(feature::GenerateInfo const & info, string const & na
                            feature::DataHeader::MapType mapType)
 {
   string const srcFilePath = info.GetTmpFileName(name);
-  string const datFilePath = info.GetTargetFileName(name);
+  string const dataFilePath = info.GetTargetFileName(name);
 
   // Store cellIds for middle points.
   CalculateMidPoints midPoints;
-  ForEachFromDatRawFormat(srcFilePath, [&midPoints](FeatureBuilder const & fb, uint64_t pos) {
+  ForEachFeatureRawFormat(srcFilePath, [&midPoints](FeatureBuilder const & fb, uint64_t pos) {
     midPoints(fb, pos);
   });
 
@@ -351,10 +373,10 @@ bool GenerateFinalFeatures(feature::GenerateInfo const & info, string const & na
     // Transform features from raw format to optimized format.
     try
     {
-      // FeaturesCollector2 will create temprory file `datFilePath + DATA_FILE_TAG`.
+      // FeaturesCollector2 will create temporary file `dataFilePath + FEATURES_FILE_TAG`.
       // We cannot remove it in ~FeaturesCollector2(), we need to remove it in SCOPE_GUARD.
-      SCOPE_GUARD(_, [&](){ Platform::RemoveFileIfExists(datFilePath + DATA_FILE_TAG); });
-      FeaturesCollector2 collector(datFilePath, header, regionData, info.m_versionDate);
+      SCOPE_GUARD(_, [&]() { Platform::RemoveFileIfExists(dataFilePath + FEATURES_FILE_TAG); });
+      FeaturesCollector2 collector(dataFilePath, header, regionData, info.m_versionDate);
 
       for (auto const & point : midPoints.GetVector())
       {
