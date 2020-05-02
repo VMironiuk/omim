@@ -464,6 +464,7 @@ Framework::Framework(FrameworkParams const & params)
 
   m_parsedMapApi.SetBookmarkManager(m_bmManager.get());
   m_routingManager.SetBookmarkManager(m_bmManager.get());
+  m_guidesManager.SetBookmarkManager(m_bmManager.get());
   m_searchMarks.SetBookmarkManager(m_bmManager.get());
 
   m_user.AddSubscriber(m_bmManager->GetUserSubscriber());
@@ -525,6 +526,7 @@ Framework::Framework(FrameworkParams const & params)
 
   m_isolinesManager.SetEnabled(LoadIsolinesEnabled());
 
+  m_guidesManager.SetApiDelegate(make_unique<GuidesOnMapDelegate>(catalogHeadersProvider));
   m_guidesManager.SetEnabled(LoadGuidesEnabled());
 
   m_adsEngine = make_unique<ads::Engine>(
@@ -552,8 +554,6 @@ Framework::Framework(FrameworkParams const & params)
   m_promoApi->SetDelegate(make_unique<PromoDelegate>(m_featuresFetcher.GetDataSource(),
                           *m_cityFinder, catalogHeadersProvider));
   eye::Eye::Instance().Subscribe(m_promoApi.get());
-
-  m_guidesManager.SetApiDelegate(make_unique<GuidesOnMapDelegate>(catalogHeadersProvider));
 
   // Clean the no longer used key from old devices.
   // Remove this line after April 2020 (assuming the majority of devices
@@ -1999,6 +1999,7 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
   m_trafficManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_transitManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_isolinesManager.SetDrapeEngine(make_ref(m_drapeEngine));
+  m_guidesManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_localAdsManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_searchMarks.SetDrapeEngine(make_ref(m_drapeEngine));
 
@@ -2068,6 +2069,7 @@ void Framework::DestroyDrapeEngine()
     m_trafficManager.SetDrapeEngine(nullptr);
     m_transitManager.SetDrapeEngine(nullptr);
     m_isolinesManager.SetDrapeEngine(nullptr);
+    m_guidesManager.SetDrapeEngine(nullptr);
     m_localAdsManager.SetDrapeEngine(nullptr);
     m_searchMarks.SetDrapeEngine(nullptr);
     GetBookmarkManager().SetDrapeEngine(nullptr);
@@ -2469,6 +2471,8 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
   {
     auto const prevTrackId = m_currentPlacePageInfo ? m_currentPlacePageInfo->GetTrackId()
                                                     : kml::kInvalidTrackId;
+    auto const prevIsGuide = m_currentPlacePageInfo && m_currentPlacePageInfo->IsGuide();
+
     m_currentPlacePageInfo = placePageInfo;
 
     // Log statistics events.
@@ -2551,6 +2555,9 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
       GetBookmarkManager().UpdateElevationMyPosition(m_currentPlacePageInfo->GetTrackId());
     }
 
+    if (m_currentPlacePageInfo->IsGuide() && prevIsGuide)
+      return;
+
     ActivateMapSelection(m_currentPlacePageInfo);
   }
   else
@@ -2609,6 +2616,13 @@ void Framework::BuildTrackPlacePage(BookmarkManager::TrackSelectionInfo const & 
   GetBookmarkManager().SetTrackSelectionInfo(trackSelectionInfo, true /* notifyListeners */);
 }
 
+void Framework::BuildGuidePlacePage(GuideMark const & guideMark, place_page::Info & info)
+{
+  m_guidesManager.OnGuideSelected(guideMark);
+  info.SetSelectedObject(df::SelectionShape::OBJECT_GUIDE);
+  info.SetIsGuide(true);
+}
+
 std::optional<place_page::Info> Framework::BuildPlacePageInfo(
     place_page::BuildInfo const & buildInfo)
 {
@@ -2655,6 +2669,18 @@ std::optional<place_page::Info> Framework::BuildPlacePageInfo(
         BuildTrackPlacePage(GetBookmarkManager().GetTrackSelectionInfo(selMark.GetTrackId()),
                             outInfo);
         return outInfo;
+      }
+      case UserMark::Type::GUIDE:
+      {
+        auto const & guideMark = *static_cast<GuideMark const *>(mark);
+        BuildGuidePlacePage(guideMark, outInfo);
+        return outInfo;
+      }
+      case UserMark::Type::GUIDE_CLUSTER:
+      {
+        auto const & guideClusterMark = *static_cast<GuidesClusterMark const *>(mark);
+        m_guidesManager.OnClusterSelected(guideClusterMark, m_currentModelView);
+        return {};
       }
       default:
         ASSERT(false, ("FindNearestUserMark returned invalid mark."));
@@ -3030,10 +3056,7 @@ bool Framework::LoadGuidesEnabled()
   return enabled;
 }
 
-void Framework::SaveGuidesEnabled(bool guidesEnabled)
-{
-  settings::Set(kGuidesEnabledKey, guidesEnabled);
-}
+void Framework::SaveGuidesEnabled(bool enabled) { settings::Set(kGuidesEnabledKey, enabled); }
 
 void Framework::EnableChoosePositionMode(bool enable, bool enableBounds, bool applyPosition,
                                          m2::PointD const & position)

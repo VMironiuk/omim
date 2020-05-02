@@ -75,6 +75,8 @@ set(
   gps_tracker.hpp
   guides_manager.cpp
   guides_manager.hpp
+  guides_marks.cpp
+  guides_marks.hpp
   guides_on_map_delegate.cpp
   guides_on_map_delegate.hpp
   isolines_manager.cpp
