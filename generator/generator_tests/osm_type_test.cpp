@@ -844,6 +844,33 @@ UNIT_CLASS_TEST(TestWithClassificator, OsmType_Cuisine)
   }
 }
 
+UNIT_CLASS_TEST(TestWithClassificator, OsmType_Hotel)
+{
+  using Type = std::vector<std::string>;
+  std::vector<std::pair<std::vector<Type>, Tags>> const types = {
+    {
+      {{"tourism", "hotel"}},
+      {{"tourism", "hotel"}},
+    },
+    {
+      {{"tourism", "hotel"}, {"building"}},
+      {{"building", "hotel"}},
+    },
+    {
+      {{"tourism", "hotel"}},
+      {{"hotel", "yes"}},
+    }
+  };
+
+  for (auto const & t : types)
+  {
+    auto const params = GetFeatureBuilderParams(t.second);
+    TEST_EQUAL(t.first.size(), params.m_types.size(), (params, t));
+    for (auto const & t : t.first)
+      TEST(params.IsTypeExist(GetType(t)), (params));
+  }
+}
+
 UNIT_CLASS_TEST(TestWithClassificator, OsmType_MergeTags)
 {
   {
@@ -1129,7 +1156,6 @@ UNIT_CLASS_TEST(TestWithClassificator, OsmType_SimpleTypesSmoke)
     {"amenity", "prison"},
     {"amenity", "pub"},
     {"amenity", "public_bookcase"},
-    {"amenity", "recycling"},
     {"amenity", "restaurant"},
     {"amenity", "school"},
     {"amenity", "shelter"},
@@ -1686,6 +1712,9 @@ UNIT_CLASS_TEST(TestWithClassificator, OsmType_ComplexTypesSmoke)
     {{"amenity", "place_of_worship", "muslim"}, {{"amenity", "place_of_worship"}, {"religion", "muslim"}}},
     {{"amenity", "place_of_worship", "shinto"}, {{"amenity", "place_of_worship"}, {"religion", "shinto"}}},
     {{"amenity", "place_of_worship", "taoist"}, {{"amenity", "place_of_worship"}, {"religion", "taoist"}}},
+    {{"amenity", "recycling"}, {{"amenity", "recycling"}, {"recycling_type","centre"}}},
+    {{"amenity", "recycling_container"}, {{"amenity", "recycling"}, {"recycling_type","container"}}},
+    {{"amenity", "recycling_container"}, {{"amenity", "recycling"}}},
     {{"amenity", "vending_machine", "cigarettes"}, {{"amenity", "vending_machine"}, {"vending", "cigarettes"}}},
     {{"amenity", "vending_machine", "drinks"}, {{"amenity", "vending_machine"}, {"vending", "drinks"}}},
     {{"amenity", "vending_machine", "parking_tickets"}, {{"amenity", "vending_machine"}, {"vending", "parking_tickets"}}},

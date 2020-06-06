@@ -6,24 +6,25 @@ class BottomMenuPresenter: NSObject {
   enum CellType: Int, CaseIterable {
     case addPlace
     case downloadRoutes
-    case bookingSearch
     case downloadMaps
     case settings
     case share
   }
-  enum Sections: Int, CaseIterable {
+  enum Sections: Int {
     case layers
     case items
   }
 
   private weak var view: BottomMenuViewProtocol?
   private let interactor: BottomMenuInteractorProtocol
-
+  private let sections: [Sections]
 
   init(view: BottomMenuViewProtocol, 
-       interactor: BottomMenuInteractorProtocol) {
+       interactor: BottomMenuInteractorProtocol,
+       sections:[Sections]) {
     self.view = view
     self.interactor = interactor
+    self.sections = sections
   }
 }
 
@@ -37,7 +38,7 @@ extension BottomMenuPresenter: BottomMenuPresenterProtocol {
 
 extension BottomMenuPresenter {
   func numberOfSections(in tableView: UITableView) -> Int {
-    Sections.allCases.count
+    sections.count
   }
 
   func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -61,11 +62,6 @@ extension BottomMenuPresenter {
                        enabled: enabled)
       case .downloadRoutes:
         cell.configure(imageName: "ic_menu_routes", title: L("download_guides"))
-      case .bookingSearch:
-        cell.configure(imageName: "ic_menu_booking_search",
-                       title: L("booking_button_toolbar"),
-                       badgeCount: 0,
-                       enabled: true)
       case .downloadMaps:
         cell.configure(imageName: "ic_menu_download",
                        title: L("download_maps"),
@@ -87,12 +83,12 @@ extension BottomMenuPresenter {
     fatalError()
   }
 
-  func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-    return section == Sections.layers.rawValue ? 12 : 0
+  func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+    return section > 0 ? 12 : 0
   }
 
-  func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
-    if section == Sections.layers.rawValue {
+  func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+    if section > 0 {
       let view = UIView()
       view.styleName = "BlackOpaqueBackground";
       return view;
@@ -115,8 +111,6 @@ extension BottomMenuPresenter {
       interactor.addPlace()
     case .downloadRoutes:
       interactor.downloadRoutes()
-    case .bookingSearch:
-      interactor.bookingSearch()
     case .downloadMaps:
       interactor.downloadMaps()
     case .settings:

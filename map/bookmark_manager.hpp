@@ -62,6 +62,8 @@ public:
   using ElevationActivePointChangedCallback = std::function<void()>;
   using ElevationMyPositionChangedCallback = std::function<void()>;
 
+  using OnSymbolSizesAcquiredCallback = std::function<void()>;
+
   using AsyncLoadingStartedCallback = std::function<void()>;
   using AsyncLoadingFinishedCallback = std::function<void()>;
   using AsyncLoadingFileCallback = std::function<void(std::string const &, bool)>;
@@ -185,6 +187,8 @@ public:
   void SetAsyncLoadingCallbacks(AsyncLoadingCallbacks && callbacks);
   bool IsAsyncLoadingInProgress() const { return m_asyncLoadingInProgress; }
 
+  bool AreSymbolSizesAcquired(OnSymbolSizesAcquiredCallback && callback);
+
   EditSession GetEditSession();
 
   void UpdateViewport(ScreenBase const & screen);
@@ -265,7 +269,7 @@ public:
 
   std::string GetCategoryName(kml::MarkGroupId categoryId) const;
   std::string GetCategoryFileName(kml::MarkGroupId categoryId) const;
-  m2::RectD GetCategoryRect(kml::MarkGroupId categoryId) const;
+  m2::RectD GetCategoryRect(kml::MarkGroupId categoryId, bool addIconsSize) const;
   kml::CategoryData const & GetCategoryData(kml::MarkGroupId categoryId) const;
 
   kml::MarkGroupId GetCategoryId(std::string const & name) const;
@@ -402,6 +406,7 @@ public:
   void ImportDownloadedFromCatalog(std::string const & id, std::string const & filePath);
   void UploadToCatalog(kml::MarkGroupId categoryId, kml::AccessRules accessRules);
   bool IsCategoryFromCatalog(kml::MarkGroupId categoryId) const;
+  kml::MarkGroupId GetCategoryIdByServerId(std::string const & serverId) const;
   std::string GetCategoryServerId(kml::MarkGroupId categoryId) const;
   std::string GetCategoryCatalogDeeplink(kml::MarkGroupId categoryId) const;
   std::string GetCategoryCatalogPublicLink(kml::MarkGroupId categoryId) const;
@@ -787,6 +792,9 @@ private:
   ElevationActivePointChangedCallback m_elevationActivePointChanged;
   ElevationMyPositionChangedCallback m_elevationMyPositionChanged;
   m2::PointD m_lastElevationMyPosition = m2::PointD::Zero();
+
+  OnSymbolSizesAcquiredCallback m_onSymbolSizesAcquiredFn;
+  bool m_symbolSizesAcquired = false;
 
   AsyncLoadingCallbacks m_asyncLoadingCallbacks;
   std::atomic<bool> m_needTeardown;

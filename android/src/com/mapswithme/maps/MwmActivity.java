@@ -30,6 +30,7 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.mapswithme.maps.Framework.PlacePageActivationListener;
 import com.mapswithme.maps.activity.CustomNavigateUpListener;
 import com.mapswithme.maps.ads.LikesManager;
@@ -62,6 +63,7 @@ import com.mapswithme.maps.editor.EditorHostFragment;
 import com.mapswithme.maps.editor.FeatureCategoryActivity;
 import com.mapswithme.maps.editor.ReportFragment;
 import com.mapswithme.maps.gallery.Items;
+import com.mapswithme.maps.guides.GuidesGalleryListener;
 import com.mapswithme.maps.intent.Factory;
 import com.mapswithme.maps.intent.MapTask;
 import com.mapswithme.maps.location.CompassData;
@@ -70,6 +72,9 @@ import com.mapswithme.maps.maplayer.MapLayerCompositeController;
 import com.mapswithme.maps.maplayer.Mode;
 import com.mapswithme.maps.maplayer.OnGuidesLayerToggleListener;
 import com.mapswithme.maps.maplayer.OnIsolinesLayerToggleListener;
+import com.mapswithme.maps.maplayer.ToggleMapLayerDialog;
+import com.mapswithme.maps.maplayer.guides.GuidesManager;
+import com.mapswithme.maps.maplayer.guides.GuidesState;
 import com.mapswithme.maps.maplayer.isolines.IsolinesManager;
 import com.mapswithme.maps.maplayer.isolines.IsolinesState;
 import com.mapswithme.maps.maplayer.subway.OnSubwayLayerToggleListener;
@@ -138,6 +143,7 @@ import com.mapswithme.util.Counters;
 import com.mapswithme.util.InputUtils;
 import com.mapswithme.util.NetworkPolicy;
 import com.mapswithme.util.PermissionsUtils;
+import com.mapswithme.util.SharedPropertiesUtils;
 import com.mapswithme.util.ThemeSwitcher;
 import com.mapswithme.util.ThemeUtils;
 import com.mapswithme.util.UTM;
@@ -154,6 +160,7 @@ import com.mapswithme.util.statistics.Statistics;
 import uk.co.samuelwall.materialtaptargetprompt.MaterialTapTargetPrompt;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Stack;
 
 public class MwmActivity extends BaseMwmFragmentActivity
@@ -183,7 +190,8 @@ public class MwmActivity extends BaseMwmFragmentActivity
                MaterialTapTargetPrompt.PromptStateChangeListener,
                WelcomeDialogFragment.OnboardingStepPassedListener,
                OnIsolinesLayerToggleListener,
-               OnGuidesLayerToggleListener
+               OnGuidesLayerToggleListener,
+               GuidesGalleryListener
 {
   private static final Logger LOGGER = LoggerFactory.INSTANCE.getLogger(LoggerFactory.Type.MISC);
   private static final String TAG = MwmActivity.class.getSimpleName();
@@ -209,7 +217,10 @@ public class MwmActivity extends BaseMwmFragmentActivity
   public static final int REQ_CODE_DRIVING_OPTIONS = 6;
   public static final int REQ_CODE_CATALOG_UNLIMITED_ACCESS = 7;
   private static final int REQ_CODE_ISOLINES_ERROR = 8;
+  private static final int REQ_CODE_GUIDES_FATAL_ERROR = 9;
+
   public static final String ERROR_DRIVING_OPTIONS_DIALOG_TAG = "error_driving_options_dialog_tag";
+  public static final String GUIDES_FATAL_ERROR_DIALOG_TAG = "guides_fatal_error_dialog_tag";
   public static final String CATALOG_UNLIMITED_ACCESS_DIALOG_TAG = "catalog_unlimited_access_dialog_tag";
   private static final String ISOLINES_ERROR_DIALOG_TAG = "isolines_dialog_tag";
 
@@ -533,7 +544,8 @@ public class MwmActivity extends BaseMwmFragmentActivity
 
     setContentView(R.layout.activity_map);
 
-    mPlacePageController = PlacePageFactory.createCompositePlacePageController(this, this, this);
+    mPlacePageController = PlacePageFactory.createCompositePlacePageController(
+        this, this, this, this);
     mPlacePageController.initialize(this);
     mPlacePageController.onActivityCreated(this, savedInstanceState);
 
@@ -1226,25 +1238,25 @@ public class MwmActivity extends BaseMwmFragmentActivity
   @Override
   public void onSubwayLayerSelected()
   {
-    mToggleMapLayerController.toggleMode(Mode.SUBWAY);
+    toggleLayer(Mode.SUBWAY, Statistics.ParamValue.MAP);
   }
 
   @Override
   public void onTrafficLayerSelected()
   {
-    mToggleMapLayerController.toggleMode(Mode.TRAFFIC);
+    toggleLayer(Mode.TRAFFIC, Statistics.ParamValue.MAP);
   }
 
   @Override
   public void onIsolinesLayerSelected()
   {
-    mToggleMapLayerController.toggleMode(Mode.ISOLINES);
+    toggleLayer(Mode.ISOLINES, Statistics.ParamValue.MAP);
   }
 
   @Override
   public void onGuidesLayerSelected()
   {
-    mToggleMapLayerController.toggleMode(Mode.GUIDES);
+    toggleLayer(Mode.GUIDES, Statistics.ParamValue.MAP);
   }
 
   private void onIsolinesStateChanged(@NonNull IsolinesState type)
@@ -1444,6 +1456,7 @@ public class MwmActivity extends BaseMwmFragmentActivity
     BookmarkManager.INSTANCE.addCatalogListener(this);
     RoutingController.get().attach(this);
     IsolinesManager.from(getApplicationContext()).attach(this::onIsolinesStateChanged);
+    GuidesManager.from(getApplicationContext()).attach(this::onGuidesStateChanged);
     if (MapFragment.nativeIsEngineCreated())
       LocationHelper.INSTANCE.attach(this);
     mPlacePageController.onActivityStarted(this);
@@ -1462,6 +1475,44 @@ public class MwmActivity extends BaseMwmFragmentActivity
     mPlacePageController.onActivityStopped(this);
     MwmApplication.backgroundTracker(getActivity()).removeListener(this);
     IsolinesManager.from(getApplicationContext()).detach();
+    GuidesManager.from(getApplicationContext()).detach();
+  }
+
+  private void onGuidesStateChanged(@NonNull GuidesState state)
+  {
+    if (state == GuidesState.FATAL_NETWORK_ERROR)
+      onGuidesFatalError();
+    else
+      state.activate(getApplicationContext());
+  }
+
+  private void onGuidesFatalError()
+  {
+    mToggleMapLayerController.turnOff();
+    RecyclerView bottomSheetRecycler = findViewById(R.id.layers_recycler);
+    Objects.requireNonNull(bottomSheetRecycler.getAdapter()).notifyDataSetChanged();
+    showGuidesFatalErrorDialog();
+    ToggleMapLayerDialog frag = ToggleMapLayerDialog.getInstance(this);
+    if (frag == null)
+      return;
+
+    RecyclerView recycler = frag.getRootView().findViewById(R.id.recycler);
+    Objects.requireNonNull(recycler.getAdapter()).notifyDataSetChanged();
+  }
+
+  private void showGuidesFatalErrorDialog()
+  {
+    com.mapswithme.maps.dialog.AlertDialog dialog =
+        new com.mapswithme.maps.dialog.AlertDialog.Builder()
+            .setTitleId(R.string.connection_error_dialog_guides_title)
+            .setMessageId(R.string.common_check_internet_connection_dialog)
+            .setPositiveBtnId(R.string.ok)
+            .setDialogViewStrategyType(com.mapswithme.maps.dialog.AlertDialog.DialogViewStrategyType.DEFAULT)
+            .setReqCode(REQ_CODE_GUIDES_FATAL_ERROR)
+            .setFragManagerStrategyType(com.mapswithme.maps.dialog.AlertDialog
+                                            .FragManagerStrategyType.ACTIVITY_FRAGMENT_MANAGER)
+            .build();
+    dialog.show(this, GUIDES_FATAL_ERROR_DIALOG_TAG);
   }
 
   @CallSuper
@@ -2603,6 +2654,20 @@ public class MwmActivity extends BaseMwmFragmentActivity
     // Do nothing by default.
   }
 
+  @Override
+  public void onGalleryGuideSelected(@NonNull String url)
+  {
+    BookmarksCatalogActivity.startForResult(
+        this, BookmarkCategoriesActivity.REQ_CODE_DOWNLOAD_BOOKMARK_CATEGORY, url);
+  }
+
+  private void toggleLayer(@NonNull Mode mode, @NonNull String from)
+  {
+    boolean isEnabled = mode.isEnabled(getApplicationContext());
+    Statistics.INSTANCE.trackMapLayerClick(mode, from, isEnabled);
+    mToggleMapLayerController.toggleMode(mode);
+  }
+
   private class CurrentPositionClickListener implements OnClickListener
   {
     @Override
@@ -2780,6 +2845,10 @@ public class MwmActivity extends BaseMwmFragmentActivity
     public void onMenuOpen()
     {
       mFadeView.fadeIn();
+      if (!SharedPropertiesUtils.shouldShowLayerTutorialToast(getApplicationContext()))
+        return;
+
+      UiUtils.showToastAtTop(getApplicationContext(), R.string.routes_layer_in_menu_toast);
     }
 
     @Override
@@ -2810,13 +2879,6 @@ public class MwmActivity extends BaseMwmFragmentActivity
     }
 
     @Override
-    public void onHotelSearchOptionSelected()
-    {
-      Statistics.INSTANCE.trackToolbarMenu(MainMenu.Item.HOTEL_SEARCH);
-      closeMenu(MwmActivity.this::runHotelCategorySearchOnMap);
-    }
-
-    @Override
     public void onDownloadMapsOptionSelected()
     {
       Statistics.INSTANCE.trackToolbarMenu(MainMenu.Item.DOWNLOAD_MAPS);
@@ -2842,25 +2904,25 @@ public class MwmActivity extends BaseMwmFragmentActivity
     @Override
     public void onSubwayLayerOptionSelected()
     {
-      onSubwayLayerSelected();
+      toggleLayer(Mode.SUBWAY, Statistics.ParamValue.MENU);
     }
 
     @Override
     public void onTrafficLayerOptionSelected()
     {
-      onTrafficLayerSelected();
+      toggleLayer(Mode.TRAFFIC, Statistics.ParamValue.MENU);
     }
 
     @Override
     public void onIsolinesLayerOptionSelected()
     {
-      onIsolinesLayerSelected();
+      toggleLayer(Mode.ISOLINES, Statistics.ParamValue.MENU);
     }
 
     @Override
     public void onGuidesLayerOptionSelected()
     {
-      onGuidesLayerSelected();
+      toggleLayer(Mode.GUIDES, Statistics.ParamValue.MENU);
     }
   }
 }

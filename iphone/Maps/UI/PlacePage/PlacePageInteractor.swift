@@ -190,12 +190,12 @@ extension PlacePageInteractor: PlacePageBookmarkViewControllerDelegate {
 // MARK: - ActionBarViewControllerDelegate
 
 extension PlacePageInteractor: ActionBarViewControllerDelegate {
-  func actionBar(_ actionBar: ActionBarViewController, dPressButton type: ActionBarButtonType) {
+  func actionBar(_ actionBar: ActionBarViewController, didPressButton type: ActionBarButtonType) {
     switch type {
     case .booking:
       MWMPlacePageManagerHelper.book(placePageData)
     case .bookingSearch:
-      MWMPlacePageManagerHelper.searchSimilar(placePageData)
+      MWMPlacePageManagerHelper.searchBookingHotels(placePageData)
     case .bookmark:
       if placePageData.bookmarkData != nil {
         MWMPlacePageManagerHelper.removeBookmark(placePageData)
@@ -232,7 +232,7 @@ extension PlacePageInteractor: ActionBarViewControllerDelegate {
       MWMPlacePageManagerHelper.route(to: placePageData)
     case .share:
       let shareVC = MWMActivityViewController.share(forPlacePage: placePageData)
-      shareVC!.present(inParentViewController: actionBar, anchorView: actionBar.popoverSourceView)
+      shareVC!.present(inParentViewController: MapViewController.shared(), anchorView: actionBar.popoverSourceView)
       Statistics.logEvent(kStatEventName(kStatPlacePage, kStatShare))
     case .avoidToll:
       MWMPlacePageManagerHelper.avoidToll()

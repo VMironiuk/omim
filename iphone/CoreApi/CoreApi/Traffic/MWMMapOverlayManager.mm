@@ -29,7 +29,9 @@ static NSString *kGuidesWasShown = @"guidesWasShown";
     _observers = [NSHashTable weakObjectsHashTable];
     GetFramework().GetTrafficManager().SetStateListener([self](TrafficManager::TrafficState state) {
       for (id<MWMMapOverlayManagerObserver> observer in self.observers) {
-        [observer onTrafficStateUpdated];
+        if ([observer respondsToSelector:@selector(onTrafficStateUpdated)]) {
+          [observer onTrafficStateUpdated];
+        }
       }
     });
     GetFramework().GetTransitManager().SetStateListener([self](TransitReadManager::TransitSchemeState state) {
@@ -48,7 +50,9 @@ static NSString *kGuidesWasShown = @"guidesWasShown";
     });
     GetFramework().GetGuidesManager().SetStateListener([self](GuidesManager::GuidesState state) {
       for (id<MWMMapOverlayManagerObserver> observer in self.observers) {
-        [observer onGuidesStateUpdated];
+        if ([observer respondsToSelector:@selector(onGuidesStateUpdated)]) {
+          [observer onGuidesStateUpdated];
+        }
       }
     });
   }
@@ -118,12 +122,14 @@ static NSString *kGuidesWasShown = @"guidesWasShown";
       return MWMMapOverlayGuidesStateDisabled;
     case GuidesManager::GuidesState::Enabled:
       return MWMMapOverlayGuidesStateEnabled;
+    case GuidesManager::GuidesState::HasData:
+      return MWMMapOverlayGuidesStateHasData;
     case GuidesManager::GuidesState::NoData:
       return MWMMapOverlayGuidesStateNoData;
     case GuidesManager::GuidesState::NetworkError:
       return MWMMapOverlayGuidesStateNetworkError;
     case GuidesManager::GuidesState::FatalNetworkError:
-      return MWMMapOverlayGuidesStateNetworkError;
+      return MWMMapOverlayGuidesStateFatalNetworkError;
   }
 }
 
@@ -146,6 +152,10 @@ static NSString *kGuidesWasShown = @"guidesWasShown";
 + (BOOL)guidesFirstLaunch {
   NSUserDefaults *ud = NSUserDefaults.standardUserDefaults;
   return ![ud boolForKey:kGuidesWasShown];
+}
+
++ (BOOL)isolinesVisible {
+  return GetFramework().GetIsolinesManager().IsVisible();
 }
 
 + (void)setTrafficEnabled:(BOOL)enable {
@@ -181,7 +191,7 @@ static NSString *kGuidesWasShown = @"guidesWasShown";
 
   auto &f = GetFramework();
   f.GetIsolinesManager().SetEnabled(enable);
-  f.SaveIsolonesEnabled(enable);
+  f.SaveIsolinesEnabled(enable);
 }
 
 + (void)setGuidesEnabled:(BOOL)enable {

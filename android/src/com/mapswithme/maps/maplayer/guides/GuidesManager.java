@@ -7,14 +7,25 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.mapswithme.maps.Framework;
 import com.mapswithme.maps.MwmApplication;
+import com.mapswithme.maps.base.Detachable;
 import com.mapswithme.maps.base.Initializable;
+import com.mapswithme.maps.guides.GuidesGallery;
 
-public class GuidesManager implements Initializable<Void>
+import java.util.ArrayList;
+import java.util.List;
+
+public class GuidesManager implements Initializable<Void>, Detachable<GuidesErrorDialogListener>
 {
   @NonNull
   private final OnGuidesChangedListener mListener;
   @NonNull
   private final Application mApplication;
+  @NonNull
+  private final List<OnGuidesGalleryChangedListener> mGalleryChangedListeners
+      = new ArrayList<>();
+
+  @Nullable
+  private GuidesErrorDialogListener mGuidesDialogListener;
 
   public GuidesManager(@NonNull Application application)
   {
@@ -25,7 +36,10 @@ public class GuidesManager implements Initializable<Void>
   private void onStateChanged(int index)
   {
     GuidesState state = GuidesState.values()[index];
-    state.activate(mApplication);
+    if (mGuidesDialogListener == null)
+      state.activate(mApplication);
+    else
+      mGuidesDialogListener.onStateChanged(state);
   }
 
   public boolean isEnabled()
@@ -33,9 +47,14 @@ public class GuidesManager implements Initializable<Void>
     return Framework.nativeIsGuidesLayerEnabled();
   }
 
-  private void registerListener()
+  public void addGalleryChangedListener(@NonNull OnGuidesGalleryChangedListener listener)
   {
-    nativeAddListener(mListener);
+    mGalleryChangedListeners.add(listener);
+  }
+
+  public void removeGalleryChangedListener(@NonNull OnGuidesGalleryChangedListener listener)
+  {
+    mGalleryChangedListeners.remove(listener);
   }
 
   public void setEnabled(boolean isEnabled)
@@ -54,12 +73,44 @@ public class GuidesManager implements Initializable<Void>
   @Override
   public void initialize(@Nullable Void param)
   {
-    registerListener();
+    nativeSetGuidesStateChangedListener(mListener);
+    nativeSetGalleryChangedListener();
   }
 
   @Override
   public void destroy()
   {
+    nativeRemoveGuidesStateChangedListener();
+    nativeRemoveGalleryChangedListener();
+  }
+
+  public void setActiveGuide(@NonNull String guideId)
+  {
+    nativeSetActiveGuide(guideId);
+  }
+
+  @NonNull
+  public String getActiveGuide()
+  {
+    return nativeGetActiveGuide();
+  }
+
+  @NonNull
+  public GuidesGallery getGallery()
+  {
+    return nativeGetGallery();
+  }
+
+  @Override
+  public void attach(@NonNull GuidesErrorDialogListener listener)
+  {
+    mGuidesDialogListener = listener;
+  }
+
+  @Override
+  public void detach()
+  {
+    mGuidesDialogListener = null;
   }
 
   @NonNull
@@ -69,5 +120,20 @@ public class GuidesManager implements Initializable<Void>
     return app.getGuidesManager();
   }
 
-  private static native void nativeAddListener(@NonNull OnGuidesChangedListener listener);
+  // Called from JNI.
+  public void onGalleryChanged(boolean reloadGallery)
+  {
+    for (OnGuidesGalleryChangedListener listener : mGalleryChangedListeners)
+      listener.onGuidesGalleryChanged(reloadGallery);
+  }
+
+  private static native void nativeSetGuidesStateChangedListener(@NonNull OnGuidesChangedListener listener);
+  private static native void nativeRemoveGuidesStateChangedListener();
+  private static native void nativeSetGalleryChangedListener();
+  private static native void nativeRemoveGalleryChangedListener();
+  private static native void nativeSetActiveGuide(@NonNull String guideId);
+  @NonNull
+  private static native String nativeGetActiveGuide();
+  @NonNull
+  private static native GuidesGallery nativeGetGallery();
 }

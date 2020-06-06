@@ -151,7 +151,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     return vc
   } ()
 
-  lazy var header: PlacePageHeaderViewController = {
+  lazy var header: PlacePageHeaderViewController? = {
     return PlacePageHeaderBuilder.build(data: placePageData.previewData, delegate: interactor, headerType: .flexible)
   } ()
 
@@ -219,7 +219,11 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     
     placePageData.loadOnlineData(completion: onLoadOnlineData)
     placePageData.onBookmarkStatusUpdate = { [weak self] in
-      self?.updateBookmarkSection()
+      guard let self = self else { return }
+      if self.placePageData.bookmarkData == nil {
+        self.actionBarViewController.resetButtons()
+      }
+      self.updateBookmarkSection()
     }
     placePageData.onUgcStatusUpdate = { [weak self] in
       self?.onLoadUgc()
@@ -326,6 +330,24 @@ extension PlacePageCommonLayout {
       }
       return
     }
+
+    let statPlacement: String
+    switch (self.placePageData.sponsoredType)
+    {
+    case .promoCatalogCity:
+      statPlacement = kStatPlacePageToponims;
+    case .promoCatalogSightseeings:
+      statPlacement = kStatPlacePageSightSeeing;
+    case .promoCatalogOutdoor:
+      statPlacement = kStatPlacePageOutdoor;
+    default:
+      statPlacement =  kStatUnknownError;
+    }
+    Statistics.logEvent(kStatPlacepageSponsoredShow, withParameters: [kStatProvider: kStatMapsmeGuides,
+                                                                      kStatState: kStatOnline,
+                                                                      kStatCount: catalogPromo.promoItems.count,
+                                                                      kStatPlacement: statPlacement])
+
     if catalogPromo.promoItems.count == 1 {
       catalogSingleItemViewController.promoItem = catalogPromo.promoItems.first!
       catalogSingleItemViewController.view.isHidden = false
@@ -350,6 +372,7 @@ extension PlacePageCommonLayout {
     } else {
       hidden = true
     }
+    self.presenter?.layoutIfNeeded()
     UIView.animate(withDuration: kDefaultAnimationDuration) { [unowned self] in
       self.bookmarkViewController.view.isHidden = hidden
       self.presenter?.layoutIfNeeded()

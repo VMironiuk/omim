@@ -7,7 +7,10 @@
 #include "drape_frontend/drape_engine.hpp"
 #include "drape_frontend/visual_params.hpp"
 
+#include "platform/platform.hpp"
 #include "platform/preferred_languages.hpp"
+
+#include "geometry/intersection_score.hpp"
 
 #include "private.h"
 
@@ -16,7 +19,21 @@
 namespace
 {
 auto constexpr kRequestAttemptsCount = 3;
+// This constant is empirically calculated based on geometry::IntersectionScore.
+// When screen scales are different more than 11.15 percent
+// it is equal less than 80 percents screen rectangles intersection.
+auto constexpr kScaleEps = 0.1115;
+
+auto constexpr kMinViewportsIntersectionScore = 0.9;
+auto constexpr kRequestingRectSidesIncrease = 0.3;
 }  // namespace
+
+GuidesManager::GuidesManager(CloseGalleryFn && closeGalleryFn)
+  : m_closeGallery(std::move(closeGalleryFn))
+  , m_statistics("guides")
+{
+  CHECK(m_closeGallery != nullptr, ());
+}
 
 GuidesManager::GuidesState GuidesManager::GetState() const
 {
@@ -26,23 +43,53 @@ GuidesManager::GuidesState GuidesManager::GetState() const
 void GuidesManager::SetStateListener(GuidesStateChangedFn const & onStateChanged)
 {
   m_onStateChanged = onStateChanged;
+  if (m_onStateChanged != nullptr)
+    m_onStateChanged(m_state);
 }
 
 void GuidesManager::UpdateViewport(ScreenBase const & screen)
 {
+  m_lastShownViewport = m_screen.GlobalRect();
   auto const zoom = df::GetDrawTileScale(screen);
 
-  // TODO(a): to implement correct way to filter out same rects.
-  if (m_currentRect.EqualDxDy(screen.GlobalRect(), 1e-4) && m_zoom == zoom)
+  if (m_state == GuidesState::Disabled || m_state == GuidesState::FatalNetworkError)
+  {
+    m_screen = screen;
+    m_zoom = zoom;
+    return;
+  }
+
+  if (screen.GlobalRect().GetLocalRect().IsEmptyInterior())
     return;
 
-  m_currentRect = screen.GlobalRect();
+  m_closeGallery();
+
+  if (IsRequestParamsInitialized())
+  {
+    auto const scaleStronglyChanged =
+      fabs(m_screen.GetScale() - screen.GetScale()) / m_screen.GetScale() > kScaleEps;
+
+    if (!scaleStronglyChanged)
+    {
+      m2::AnyRectD::Corners currentCorners;
+      m_screen.GlobalRect().GetGlobalPoints(currentCorners);
+
+      m2::AnyRectD::Corners screenCorners;
+      screen.GlobalRect().GetGlobalPoints(screenCorners);
+
+      auto const score = geometry::GetIntersectionScoreForPoints(currentCorners, screenCorners);
+
+      // If more than |kMinViewportsIntersectionScore| of viewport rect
+      // intersects with last requested rect then return.
+      if (score > kMinViewportsIntersectionScore)
+        return;
+    }
+  }
+
+  m_screen = screen;
   m_zoom = zoom;
 
-  if (m_state == GuidesState::Disabled || m_state == GuidesState::FatalNetworkError)
-    return;
-
-  RequestGuides(m_currentRect, m_zoom);
+  RequestGuides();
 }
 
 void GuidesManager::Invalidate()
@@ -56,7 +103,7 @@ void GuidesManager::Reconnect()
     return;
 
   ChangeState(GuidesState::Enabled);
-  RequestGuides(m_currentRect, m_zoom);
+  RequestGuides();
 }
 
 void GuidesManager::SetEnabled(bool enabled)
@@ -64,14 +111,22 @@ void GuidesManager::SetEnabled(bool enabled)
   auto const newState = enabled ? GuidesState::Enabled : GuidesState::Disabled;
   if (newState == m_state)
     return;
+  m_drapeEngine.SafeCall(&df::DrapeEngine::EnableGuides, enabled);
 
   Clear();
+  m_shownGuides.clear();
   ChangeState(newState);
 
   if (!enabled)
     return;
 
-  RequestGuides(m_currentRect, m_zoom);
+  if (!GetPlatform().IsConnected())
+  {
+    ChangeState(GuidesState::FatalNetworkError);
+    return;
+  }
+
+  RequestGuides(true /* suggestZoom */);
 }
 
 bool GuidesManager::IsEnabled() const
@@ -86,34 +141,70 @@ void GuidesManager::ChangeState(GuidesState newState)
   m_state = newState;
   if (m_onStateChanged != nullptr)
     m_onStateChanged(newState);
+
+  if (m_shownGuides.empty())
+    TrackStatistics();
 }
 
-void GuidesManager::RequestGuides(m2::AnyRectD const & rect, int zoom)
+void GuidesManager::RequestGuides(bool suggestZoom)
 {
-  if (rect.GetLocalRect().IsEmptyInterior())
+  if (!IsRequestParamsInitialized())
     return;
 
+  auto screenRect = m_screen.GlobalRect();
+
+  auto rect = screenRect.GetGlobalRect();
+
+  screenRect.Inflate(rect.SizeX() * kRequestingRectSidesIncrease,
+                     rect.SizeY() * kRequestingRectSidesIncrease);
+  m2::AnyRectD::Corners corners;
+  screenRect.GetGlobalPoints(corners);
+
+  for (auto & p : corners)
+    mercator::ClampPoint(p);
+
   auto const requestNumber = ++m_requestCounter;
-  m_api.GetGuidesOnMap(
-      rect, zoom,
-      [this](guides_on_map::GuidesOnMap const & guides) {
-        if (m_state == GuidesState::Disabled)
+  auto const id = m_api.GetGuidesOnMap(
+      corners, m_zoom, suggestZoom,
+      [this, suggestZoom, requestNumber](guides_on_map::GuidesOnMap const & guides) {
+        if (m_state == GuidesState::Disabled || requestNumber != m_requestCounter)
           return;
 
         m_guides = guides;
         m_errorRequestsCount = 0;
 
-        if (!m_guides.empty())
-          ChangeState(GuidesState::Enabled);
+        if (!m_guides.m_nodes.empty())
+        {
+          ChangeState(GuidesState::HasData);
+        }
         else
-          ChangeState(GuidesState::NoData);
+        {
+          if (suggestZoom && m_zoom > m_guides.m_suggestedZoom)
+          {
+            m_drapeEngine.SafeCall(&df::DrapeEngine::SetModelViewCenter,
+                                   m_lastShownViewport.GetGlobalRect().Center(),
+                                   m_guides.m_suggestedZoom,
+                                   true /* isAnim */, false /* trackVisibleViewport */);
+          }
+          else
+          {
+            ChangeState(GuidesState::NoData);
+          }
+        }
 
         UpdateGuidesMarks();
 
-        if (m_onGalleryChanged)
-          m_onGalleryChanged(true /* reload */);
+        if (m_activeGuide.empty())
+        {
+          m_closeGallery();
+        }
+        else
+        {
+          if (m_onGalleryChanged)
+            m_onGalleryChanged(true /* reload */);
+        }
       },
-      [this, requestNumber, zoom]() mutable {
+      [this, requestNumber]() mutable {
         if (m_state == GuidesState::Disabled || m_state == GuidesState::FatalNetworkError)
           return;
 
@@ -129,74 +220,37 @@ void GuidesManager::RequestGuides(m2::AnyRectD const & rect, int zoom)
 
         // Re-request only when no additional requests enqueued.
         if (requestNumber == m_requestCounter)
-          RequestGuides(m_currentRect, zoom);
+          RequestGuides();
       });
+
+  if (id != base::TaskLoop::kIncorrectId)
+  {
+    if (m_previousRequestsId != base::TaskLoop::kIncorrectId)
+      GetPlatform().CancelTask(Platform::Thread::Network, m_previousRequestsId);
+
+    m_previousRequestsId = id;
+  }
 }
 
 void GuidesManager::Clear()
 {
   m_activeGuide.clear();
-  m_guides.clear();
+  m_guides = {};
   m_errorRequestsCount = 0;
 
   UpdateGuidesMarks();
+  m_closeGallery();
 }
 
 GuidesManager::GuidesGallery GuidesManager::GetGallery() const
 {
-  // Dummy gallery hardcode for debug only.
   GuidesGallery gallery;
-  {
-    GuidesGallery::Item item;
-    item.m_guideId = "048f4c49-ee80-463f-8513-e57ade2303ee";
-    item.m_url = "https://routes.maps.me/en/v3/mobilefront/route/048f4c49-ee80-463f-8513-e57ade2303ee";
-    item.m_imageUrl = "https://storage.maps.me/bookmarks_catalogue/"
-                      "002dc2ae-7b5c-4d3c-88bc-7c7ba109d0e8.jpg?t=1584470956.009026";
-    item.m_title = "Moscow by The Village";
-    item.m_subTitle = "awesome city guide";
-    item.m_type = GuidesGallery::Item::Type::City;
-    item.m_downloaded = false;
-    item.m_cityParams.m_bookmarksCount = 32;
-    item.m_cityParams.m_trackIsAvailable = false;
-
-    gallery.m_items.emplace_back(std::move(item));
-  }
-
-  {
-    GuidesGallery::Item item;
-    item.m_guideId = "e2d448eb-7fa4-4fab-93e7-ef0fea91cfff";
-    item.m_url = "https://routes.maps.me/en/v3/mobilefront/route/e2d448eb-7fa4-4fab-93e7-ef0fea91cfff";
-    item.m_imageUrl = "https://storage.maps.me/bookmarks_catalogue/"
-                      "002dc2ae-7b5c-4d3c-88bc-7c7ba109d0e8.jpg?t=1584470956.009026";
-    item.m_title = "Riga City Tour";
-    item.m_subTitle = "awesome city guide";
-    item.m_type = GuidesGallery::Item::Type::City;
-    item.m_downloaded = true;
-    item.m_cityParams.m_bookmarksCount = 31;
-    item.m_cityParams.m_trackIsAvailable = true;
-
-    gallery.m_items.emplace_back(std::move(item));
-  }
-
-  {
-    GuidesGallery::Item item;
-    item.m_guideId = "d26a6662-20a3-432c-a357-c9cb3cce6d57";
-    item.m_url = "https://routes.maps.me/en/v3/mobilefront/route/d26a6662-20a3-432c-a357-c9cb3cce6d57";
-    item.m_imageUrl = "https://img.oastatic.com/img2/1966324/834x417s/t.jpg";
-    item.m_title = "Klassik trifft Romantik";
-    item.m_subTitle = "Hiking / Trekking";
-    item.m_type = GuidesGallery::Item::Type::Outdoor;
-    item.m_downloaded = false;
-    item.m_outdoorsParams.m_ascent = 400;
-    item.m_outdoorsParams.m_distance = 24100;
-    item.m_outdoorsParams.m_duration = 749246;
-
-    gallery.m_items.emplace_back(std::move(item));
-  }
-
-  for (auto const & guide : m_guides)
+  for (auto const & guide : m_guides.m_nodes)
   {
     if (guide.m_outdoorCount + guide.m_sightsCount != 1)
+      continue;
+
+    if (!m_lastShownViewport.IsPointInside(guide.m_point))
       continue;
 
     auto const & info = guide.m_guideInfo;
@@ -204,9 +258,11 @@ GuidesManager::GuidesGallery GuidesManager::GetGallery() const
     GuidesGallery::Item item;
     item.m_guideId = info.m_id;
 
-    auto url = url::Join(BOOKMARKS_CATALOG_FRONT_URL, languages::GetCurrentNorm(), "v3/mobilefront",
-                         info.m_id);
-    InjectUTM(url, UTM::GuidesOnMapGallery);
+    auto url = url::Join(BOOKMARKS_CATALOG_FRONT_URL, languages::GetCurrentNorm(),
+                         "v3/mobilefront/route", info.m_id);
+    url = InjectUTM(url, UTM::GuidesOnMapGallery);
+    url = InjectUTMTerm(url, std::to_string(m_shownGuides.size()));
+
     item.m_url = std::move(url);
     item.m_imageUrl = info.m_imageUrl;
     item.m_title = info.m_name;
@@ -217,7 +273,6 @@ GuidesManager::GuidesGallery GuidesManager::GetGallery() const
       item.m_type = GuidesGallery::Item::Type::City;
       item.m_cityParams.m_bookmarksCount = guide.m_guideInfo.m_bookmarksCount;
       item.m_cityParams.m_trackIsAvailable = guide.m_guideInfo.m_hasTrack;
-      item.m_subTitle = "TODO(a): to add correct value";
     }
     else
     {
@@ -225,22 +280,19 @@ GuidesManager::GuidesGallery GuidesManager::GetGallery() const
       item.m_outdoorsParams.m_duration = guide.m_guideInfo.m_tourDuration;
       item.m_outdoorsParams.m_distance = guide.m_guideInfo.m_tracksLength;
       item.m_outdoorsParams.m_ascent = guide.m_guideInfo.m_ascent;
-      item.m_subTitle = guide.m_guideInfo.m_tag;
+      item.m_outdoorsParams.m_tag = guide.m_guideInfo.m_tag;
     }
 
     gallery.m_items.emplace_back(std::move(item));
   }
 
-  // Dummy, for debug only.
-  while (gallery.m_items.size() < 10)
-  {
-    std::copy(gallery.m_items.begin(), gallery.m_items.end(), std::back_inserter(gallery.m_items));
-  }
-
   return gallery;
 }
 
-std::string GuidesManager::GetActiveGuide() const { return m_activeGuide; }
+std::string GuidesManager::GetActiveGuide() const
+{
+  return m_activeGuide;
+}
 
 void GuidesManager::SetActiveGuide(std::string const & guideId)
 {
@@ -249,6 +301,11 @@ void GuidesManager::SetActiveGuide(std::string const & guideId)
 
   m_activeGuide = guideId;
   UpdateActiveGuide();
+}
+
+uint64_t GuidesManager::GetShownGuidesCount() const
+{
+  return m_shownGuides.size();
 }
 
 void GuidesManager::SetGalleryListener(GuidesGalleryChangedFn const & onGalleryChanged)
@@ -281,7 +338,7 @@ void GuidesManager::UpdateGuidesMarks()
   auto es = m_bmManager->GetEditSession();
   es.ClearGroup(UserMark::GUIDE_CLUSTER);
   es.ClearGroup(UserMark::GUIDE);
-  for (auto & guide : m_guides)
+  for (auto & guide : m_guides.m_nodes)
   {
     if (guide.m_sightsCount + guide.m_outdoorCount > 1)
     {
@@ -297,6 +354,7 @@ void GuidesManager::UpdateGuidesMarks()
       mark->SetGuideId(guide.m_guideInfo.m_id);
       mark->SetIsDownloaded(IsGuideDownloaded(guide.m_guideInfo.m_id));
       mark->SetIndex(++m_nextMarkIndex);
+      m_shownGuides.insert(guide.m_guideInfo.m_id);
     }
   }
   UpdateActiveGuide();
@@ -306,17 +364,15 @@ void GuidesManager::OnClusterSelected(GuidesClusterMark const & mark, ScreenBase
 {
   m_drapeEngine.SafeCall(&df::DrapeEngine::Scale, 2.0, screen.GtoP(mark.GetPivot()),
                          true /* isAnim */);
+  m_statistics.LogItemSelected(LayersStatistics::LayerItemType::Cluster);
 }
 
-void GuidesManager::OnGuideSelected(GuideMark const & mark)
+void GuidesManager::OnGuideSelected()
 {
-  auto es = m_bmManager->GetEditSession();
-  es.ClearGroup(UserMark::Type::GUIDE_SELECTION);
-  es.CreateUserMark<GuideSelectionMark>(mark.GetPivot());
-
-  m_activeGuide = mark.GetGuideId();
   if (m_onGalleryChanged)
     m_onGalleryChanged(false /* reload */);
+
+  m_statistics.LogItemSelected(LayersStatistics::LayerItemType::Point);
 }
 
 void GuidesManager::UpdateActiveGuide()
@@ -334,4 +390,33 @@ void GuidesManager::UpdateActiveGuide()
     }
   }
   m_activeGuide.clear();
+}
+
+bool GuidesManager::IsRequestParamsInitialized() const
+{
+  return m_screen.GlobalRect().GetLocalRect().IsEmptyInterior() || m_zoom != 0;
+}
+
+void GuidesManager::TrackStatistics() const
+{
+  if (m_state == GuidesState::HasData)
+    m_statistics.LogActivate(LayersStatistics::Status::Success);
+  else if (m_state == GuidesState::NoData)
+    m_statistics.LogActivate(LayersStatistics::Status::Unavailable);
+  else if (m_state == GuidesState::NetworkError || m_state == GuidesState::FatalNetworkError)
+    m_statistics.LogActivate(LayersStatistics::Status::Error);
+}
+
+std::string DebugPrint(GuidesManager::GuidesState state)
+{
+  switch (state)
+  {
+  case GuidesManager::GuidesState::Disabled: return "Disabled";
+  case GuidesManager::GuidesState::Enabled: return "Enabled";
+  case GuidesManager::GuidesState::HasData: return "HasData";
+  case GuidesManager::GuidesState::NoData: return "NoData";
+  case GuidesManager::GuidesState::NetworkError: return "NetworkError";
+  case GuidesManager::GuidesState::FatalNetworkError: return "FatalNetworkError";
+  }
+  UNREACHABLE();
 }

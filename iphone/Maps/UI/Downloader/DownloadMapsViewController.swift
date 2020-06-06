@@ -20,13 +20,11 @@ class DownloadMapsViewController: MWMViewController {
   // MARK: - Outlets
 
   @IBOutlet var tableView: UITableView!
-  @IBOutlet var allMapsView: UIView!
-  @IBOutlet var allMapsButton: UIButton!
-  @IBOutlet var allMapsCancelButton: UIButton!
   @IBOutlet var searchBar: UISearchBar!
   @IBOutlet var statusBarBackground: UIView!
   @IBOutlet var noMapsContainer: UIView!
   @IBOutlet var searchBarTopOffset: NSLayoutConstraint!
+  @IBOutlet var downloadAllViewContainer: UIView!
 
   // MARK: - Properties
 
@@ -34,7 +32,7 @@ class DownloadMapsViewController: MWMViewController {
   @objc var mode: MWMMapDownloaderMode = .downloaded
   private var skipCountryEvent = false
   private var hasAddMapSection: Bool { dataSource.isRoot && mode == .downloaded }
-  private let allMapsViewBottomOffsetConstant: CGFloat = 60
+  private let allMapsViewBottomOffsetConstant: CGFloat = 64
 
   lazy var noSerchResultViewController: SearchNoResultsViewController = {
     let vc = storyboard!.instantiateViewController(ofType: SearchNoResultsViewController.self)
@@ -44,6 +42,13 @@ class DownloadMapsViewController: MWMViewController {
     addChild(vc)
     vc.didMove(toParent: self)
     return vc
+  }()
+  lazy var downloadAllView: DownloadAllView = {
+    let view = Bundle.main.load(viewClass: DownloadAllView.self)?.first as! DownloadAllView
+    view.delegate = self
+    downloadAllViewContainer.addSubview(view)
+    view.alignToSuperview()
+    return view
   }()
 
   // MARK: - Methods
@@ -77,6 +82,11 @@ class DownloadMapsViewController: MWMViewController {
     } else {
       searchBar.placeholder = L("downloader_search_field_hint")
     }
+    configButtons()
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
     configButtons()
   }
 
@@ -160,72 +170,57 @@ class DownloadMapsViewController: MWMViewController {
     }
   }
 
-  private func setAllMapsButton(_ state: AllMapsButtonState) {
-    switch state {
-    case .none:
-      allMapsView.isHidden = true
-    case .download(let buttonTitle):
-      allMapsView.isHidden = false
-      allMapsButton.isHidden = false
-      allMapsButton.setTitle(buttonTitle, for: .normal)
-      allMapsCancelButton.isHidden = true
-    case .cancel(let buttonTitle):
-      allMapsView.isHidden = false
-      allMapsButton.isHidden = true
-      allMapsCancelButton.isHidden = false
-      allMapsCancelButton.setTitle(buttonTitle, for: .normal)
-    }
-    if !allMapsView.isHidden {
-      tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: allMapsViewBottomOffsetConstant, right: 0)
-    } else {
-      tableView.contentInset = UIEdgeInsets.zero
-    }
+  fileprivate func reloadData() {
+    tableView.reloadData()
+    configButtons()
   }
 
   fileprivate func configButtons() {
-    allMapsView.isHidden = true
-    if mode == .available {
+    downloadAllView.state = .none
+    downloadAllView.isSizeHidden = false
+    let parentAttributes = dataSource.parentAttributes()
+    let error = parentAttributes.nodeStatus == .error || parentAttributes.nodeStatus == .undefined
+    let downloading = parentAttributes.nodeStatus == .downloading || parentAttributes.nodeStatus == .inQueue || parentAttributes.nodeStatus == .applying
+    switch mode {
+    case .available:
       if dataSource.isRoot {
-        setAllMapsButton(.none)
-      } else {
-        let parentAttributes = dataSource.parentAttributes()
-        if parentAttributes.downloadingMwmCount > 0 {
-          setAllMapsButton(.cancel("\(L("downloader_cancel_all")) (\(formattedSize(parentAttributes.downloadingSize)))"))
-        } else if parentAttributes.downloadedMwmCount < parentAttributes.totalMwmCount {
-          setAllMapsButton(.download("\(L("downloader_download_all_button")) (\(formattedSize(parentAttributes.totalSize - parentAttributes.downloadedSize)))"))
-        }
+        break
       }
-    } else {
-      let updateInfo = Storage.shared().updateInfo(withParent: dataSource.parentAttributes().countryId)
-      if updateInfo.numberOfFiles > 0 {
-        setAllMapsButton(.download("\(L("downloader_update_all_button")) (\(formattedSize(updateInfo.updateSize)))"))
-      } else {
-        let parentAttributes = dataSource.parentAttributes()
-        if parentAttributes.downloadingMwmCount > 0 {
-          setAllMapsButton(.cancel(L("downloader_cancel_all")))
-        }
+      if error {
+        downloadAllView.state = .error
+      } else if downloading {
+        downloadAllView.state = .dowloading
+      } else if parentAttributes.downloadedMwmCount < parentAttributes.totalMwmCount {
+        downloadAllView.state = .ready
+        downloadAllView.style = .download
+        downloadAllView.downloadSize = parentAttributes.totalSize - parentAttributes.downloadedSize
       }
+    case .downloaded:
+      let isUpdate = parentAttributes.totalUpdateSizeBytes > 0
+      let size = isUpdate ? parentAttributes.totalUpdateSizeBytes : parentAttributes.downloadingSize
+      if error {
+        downloadAllView.state = dataSource.isRoot ? .none : .error
+        downloadAllView.downloadSize = parentAttributes.downloadingSize
+      } else if downloading && dataSource is DownloadedMapsDataSource {
+        downloadAllView.state = .dowloading
+        if dataSource.isRoot {
+          downloadAllView.style = .download
+          downloadAllView.isSizeHidden = true
+        }
+      } else if isUpdate {
+        downloadAllView.state = .ready
+        downloadAllView.style = .update
+        downloadAllView.downloadSize = size
+      }
+    @unknown default:
+      fatalError()
     }
   }
 
-  @IBAction func onAllMaps(_ sender: UIButton) {
-    skipCountryEvent = true
-    if mode == .downloaded {
-      Storage.shared().updateNode(dataSource.parentAttributes().countryId)
-    } else {
-      Storage.shared().downloadNode(dataSource.parentAttributes().countryId)
-    }
-    skipCountryEvent = false
-    self.processCountryEvent(dataSource.parentAttributes().countryId)
-  }
-
-  @IBAction func onCancelAllMaps(_ sender: UIButton) {
-    skipCountryEvent = true
-    Storage.shared().cancelDownloadNode(dataSource.parentAttributes().countryId)
-    Statistics.logEvent(kStatDownloaderDownloadCancel, withParameters: [kStatFrom: kStatMap])
-    skipCountryEvent = false
-    self.processCountryEvent(dataSource.parentAttributes().countryId)
-    tableView.reloadData()
+  @objc func onAddMaps() {
+    let vc = storyboard!.instantiateViewController(ofType: DownloadMapsViewController.self)
+    vc.mode = .available
+    navigationController?.pushViewController(vc, animated: true)
   }
 }
 
@@ -247,7 +242,6 @@ extension DownloadMapsViewController: UITableViewDataSource {
     if hasAddMapSection && indexPath.section == dataSource.numberOfSections()  {
       let cellType = MWMMapDownloaderButtonTableViewCell.self
       let buttonCell = tableView.dequeueReusableCell(cell: cellType, indexPath: indexPath)
-      buttonCell.delegate = self
       return buttonCell
     }
 
@@ -331,6 +325,10 @@ extension DownloadMapsViewController: UITableViewDelegate {
 
   func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     tableView.deselectRow(at: indexPath, animated: true)
+    if indexPath.section == dataSource.numberOfSections() {
+      onAddMaps()
+      return
+    }
     let nodeAttrs = dataSource.item(at: indexPath)
     if nodeAttrs.hasChildren {
       showChildren(dataSource.item(at: indexPath))
@@ -395,7 +393,7 @@ extension DownloadMapsViewController: StorageObserver {
       return
     }
     dataSource.reload {
-      tableView.reloadData()
+      reloadData()
       noMapsContainer.isHidden = !dataSource.isEmpty || Storage.shared().downloadInProgress()
     }
     if countryId == dataSource.parentAttributes().countryId {
@@ -415,6 +413,15 @@ extension DownloadMapsViewController: StorageObserver {
       guard let downloaderCell = cell as? MWMMapDownloaderTableViewCell else { continue }
       if downloaderCell.nodeAttrs.countryId != countryId { continue }
       downloaderCell.setDownloadProgress(CGFloat(downloadedBytes) / CGFloat(totalBytes))
+    }
+
+    let parentAttributes = dataSource.parentAttributes()
+    if countryId == parentAttributes.countryId {
+      downloadAllView.downloadProgress = CGFloat(downloadedBytes) / CGFloat(totalBytes)
+      downloadAllView.downloadSize = totalBytes
+    } else if dataSource.isRoot && dataSource is DownloadedMapsDataSource {
+      downloadAllView.state = .dowloading
+      downloadAllView.isSizeHidden = true
     }
   }
 }
@@ -442,7 +449,7 @@ extension DownloadMapsViewController: UISearchBarDelegate {
     searchBar.text = nil
     searchBar.resignFirstResponder()
     dataSource.cancelSearch()
-    tableView.reloadData()
+    reloadData()
     self.noSerchResultViewController.view.isHidden = true
   }
 
@@ -450,7 +457,7 @@ extension DownloadMapsViewController: UISearchBarDelegate {
     let locale = searchBar.textInputMode?.primaryLanguage
     dataSource.search(searchText, locale: locale ?? "") { [weak self] (finished) in
       guard let self = self else { return }
-      self.tableView.reloadData()
+      self.reloadData()
       self.noSerchResultViewController.view.isHidden = !self.dataSource.isEmpty
     }
   }
@@ -464,12 +471,43 @@ extension DownloadMapsViewController: UIBarPositioningDelegate {
   }
 }
 
-// MARK: - MWMMapDownloaderButtonTableViewCellProtocol
+// MARK: - DownloadAllViewDelegate
 
-extension DownloadMapsViewController: MWMMapDownloaderButtonTableViewCellProtocol {
-  @objc func onAddMaps() {
-    let vc = storyboard!.instantiateViewController(ofType: DownloadMapsViewController.self)
-    vc.mode = .available
-    navigationController?.pushViewController(vc, animated: true)
+extension DownloadMapsViewController: DownloadAllViewDelegate {
+  func onStateChanged(state: DownloadAllView.State) {
+    if state == .none {
+      downloadAllViewContainer.isHidden = true
+      tableView.contentInset = UIEdgeInsets.zero
+    } else {
+      downloadAllViewContainer.isHidden = false
+      tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: allMapsViewBottomOffsetConstant, right: 0)
+    }
+  }
+
+  func onDownloadButtonPressed() {
+    skipCountryEvent = true
+    if mode == .downloaded {
+      Storage.shared().updateNode(dataSource.parentAttributes().countryId)
+    } else {
+      Storage.shared().downloadNode(dataSource.parentAttributes().countryId)
+    }
+    skipCountryEvent = false
+    self.processCountryEvent(dataSource.parentAttributes().countryId)
+  }
+
+  func onRetryButtonPressed() {
+    skipCountryEvent = true
+    Storage.shared().retryDownloadNode(dataSource.parentAttributes().countryId)
+    skipCountryEvent = false
+    self.processCountryEvent(dataSource.parentAttributes().countryId)
+  }
+
+  func onCancelButtonPressed() {
+    skipCountryEvent = true
+    Storage.shared().cancelDownloadNode(dataSource.parentAttributes().countryId)
+    Statistics.logEvent(kStatDownloaderDownloadCancel, withParameters: [kStatFrom: kStatMap])
+    skipCountryEvent = false
+    self.processCountryEvent(dataSource.parentAttributes().countryId)
+    reloadData()
   }
 }

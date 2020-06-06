@@ -155,7 +155,8 @@ char const kShowDebugInfo[] = "DebugInfo";
 char const kICUDataFile[] = "icudt57l.dat";
 #endif
 
-double const kLargeFontsScaleFactor = 1.6;
+auto constexpr kLargeFontsScaleFactor = 1.6;
+auto constexpr kGuidesEnabledInBackgroundMaxHours = 8;
 size_t constexpr kMaxTrafficCacheSizeBytes = 64 /* Mb */ * 1024 * 1024;
 
 // TODO!
@@ -381,6 +382,11 @@ Framework::Framework(FrameworkParams const & params)
                      bind(&Framework::GetMwmsByRect, this, _1, false /* rough */))
   , m_isolinesManager(m_featuresFetcher.GetDataSource(),
                       bind(&Framework::GetMwmsByRect, this, _1, false /* rough */))
+  , m_guidesManager([this]()
+                    {
+                      if (m_currentPlacePageInfo && m_currentPlacePageInfo->IsGuide())
+                        DeactivateMapSelection(true /* notifyUI */);
+                    })
   , m_routingManager(
         RoutingManager::Callbacks(
             [this]() -> DataSource & { return m_featuresFetcher.GetDataSource(); },
@@ -462,6 +468,7 @@ Framework::Framework(FrameworkParams const & params)
 
   m_bmManager->InitRegionAddressGetter(m_featuresFetcher.GetDataSource(), *m_infoGetter);
 
+  catalogHeadersProvider->SetBookmarkCatalog(&m_bmManager->GetCatalog());
   m_parsedMapApi.SetBookmarkManager(m_bmManager.get());
   m_routingManager.SetBookmarkManager(m_bmManager.get());
   m_guidesManager.SetBookmarkManager(m_bmManager.get());
@@ -1148,7 +1155,7 @@ void Framework::ShowTrack(kml::TrackId trackId)
     return;
 
   auto rect = track->GetLimitRect();
-  ExpandBookmarksRectForPreview(rect);
+  ExpandRectForPreview(rect);
 
   StopLocationFollow();
   ShowRect(rect);
@@ -1163,11 +1170,11 @@ void Framework::ShowTrack(kml::TrackId trackId)
 void Framework::ShowBookmarkCategory(kml::MarkGroupId categoryId, bool animation)
 {
   auto & bm = GetBookmarkManager();
-  auto rect = bm.GetCategoryRect(categoryId);
+  auto rect = bm.GetCategoryRect(categoryId, true /* addIconsSize */);
   if (!rect.IsValid())
     return;
 
-  ExpandBookmarksRectForPreview(rect);
+  ExpandRectForPreview(rect);
 
   StopLocationFollow();
   ShowRect(rect, -1 /* maxScale */, animation);
@@ -1499,8 +1506,19 @@ void Framework::EnterForeground()
   m_startForegroundTime = base::Timer::LocalTime();
   if (m_drapeEngine != nullptr && m_startBackgroundTime != 0.0)
   {
-    auto const timeInBackground = m_startForegroundTime - m_startBackgroundTime;
-    m_drapeEngine->SetTimeInBackground(timeInBackground);
+    auto const secondsInBackground = m_startForegroundTime - m_startBackgroundTime;
+    m_drapeEngine->SetTimeInBackground(secondsInBackground);
+
+    if (m_guidesManager.IsEnabled() &&
+      secondsInBackground / 60 / 60 > kGuidesEnabledInBackgroundMaxHours)
+    {
+      auto const shownCount = m_guidesManager.GetShownGuidesCount();
+      m_guidesManager.SetEnabled(false);
+      SaveGuidesEnabled(false);
+
+      alohalytics::LogEvent("Map_Layers_deactivate",
+                            {{"name", "guides"}, {"count", strings::to_string(shownCount)}});
+    }
   }
 
   m_trafficManager.OnEnterForeground();
@@ -1846,19 +1864,16 @@ bool Framework::GetDistanceAndAzimut(m2::PointD const & point,
   // Distance may be less than 1.0
   UNUSED_VALUE(measurement_utils::FormatDistance(d, distance));
 
-  if (north >= 0.0)
-  {
-    // We calculate azimut even when distance is very short (d ~ 0),
-    // because return value has 2 states (near me or far from me).
+  // We calculate azimuth even when distance is very short (d ~ 0),
+  // because return value has 2 states (near me or far from me).
 
-    azimut = ang::Azimuth(mercator::FromLatLon(lat, lon), point, north);
+  azimut = ang::Azimuth(mercator::FromLatLon(lat, lon), point, north);
 
-    double const pi2 = 2.0*math::pi;
-    if (azimut < 0.0)
-      azimut += pi2;
-    else if (azimut > pi2)
-      azimut -= pi2;
-  }
+  double const pi2 = 2.0*math::pi;
+  if (azimut < 0.0)
+    azimut += pi2;
+  else if (azimut > pi2)
+    azimut -= pi2;
 
   // This constant and return value is using for arrow/flag choice.
   return (d < 25000.0);
@@ -1939,11 +1954,12 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
   bool allow3dBuildings;
   Load3dMode(allow3d, allow3dBuildings);
 
-  bool const isAutozoomEnabled = LoadAutoZoom();
-  bool const trafficEnabled = m_trafficManager.IsEnabled();
+  auto const isAutozoomEnabled = LoadAutoZoom();
+  auto const trafficEnabled = m_trafficManager.IsEnabled();
   auto const isolinesEnabled = m_isolinesManager.IsEnabled();
-  bool const simplifiedTrafficColors = m_trafficManager.HasSimplifiedColorScheme();
-  double const fontsScaleFactor = LoadLargeFontsSize() ? kLargeFontsScaleFactor : 1.0;
+  auto const guidesEnabled = m_guidesManager.IsEnabled();
+  auto const simplifiedTrafficColors = m_trafficManager.HasSimplifiedColorScheme();
+  auto const fontsScaleFactor = LoadLargeFontsSize() ? kLargeFontsScaleFactor : 1.0;
 
   df::DrapeEngine::Params p(
       params.m_apiVersion, contextFactory,
@@ -1952,7 +1968,8 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
                           move(isCountryLoadedByNameFn), move(updateCurrentCountryFn)),
       params.m_hints, params.m_visualScale, fontsScaleFactor, move(params.m_widgetsInitInfo),
       make_pair(params.m_initialMyPositionState, params.m_hasMyPositionState),
-      move(myPositionModeChangedFn), allow3dBuildings, trafficEnabled, isolinesEnabled,
+      move(myPositionModeChangedFn), allow3dBuildings,
+      trafficEnabled, isolinesEnabled, guidesEnabled,
       params.m_isChoosePositionMode, params.m_isChoosePositionMode, GetSelectedFeatureTriangles(),
       m_routingManager.IsRoutingActive() && m_routingManager.IsRoutingFollowing(),
       isAutozoomEnabled, simplifiedTrafficColors, move(overlaysShowStatsFn), move(isUGCFn),
@@ -2415,6 +2432,9 @@ void Framework::ActivateMapSelection(std::optional<place_page::Info> const & inf
   if (!info)
     return;
 
+  if (info->GetSelectedObject() == df::SelectionShape::OBJECT_GUIDE)
+    StopLocationFollow();
+
   if (info->GetSelectedObject() == df::SelectionShape::OBJECT_TRACK)
     GetBookmarkManager().OnTrackSelected(info->GetTrackId());
   else
@@ -2556,7 +2576,10 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
     }
 
     if (m_currentPlacePageInfo->IsGuide() && prevIsGuide)
+    {
+      m_guidesManager.OnGuideSelected();
       return;
+    }
 
     ActivateMapSelection(m_currentPlacePageInfo);
   }
@@ -2618,7 +2641,7 @@ void Framework::BuildTrackPlacePage(BookmarkManager::TrackSelectionInfo const & 
 
 void Framework::BuildGuidePlacePage(GuideMark const & guideMark, place_page::Info & info)
 {
-  m_guidesManager.OnGuideSelected(guideMark);
+  m_guidesManager.SetActiveGuide(guideMark.GetGuideId());
   info.SetSelectedObject(df::SelectionShape::OBJECT_GUIDE);
   info.SetIsGuide(true);
 }
@@ -3043,7 +3066,7 @@ bool Framework::LoadIsolinesEnabled()
   return enabled;
 }
 
-void Framework::SaveIsolonesEnabled(bool enabled)
+void Framework::SaveIsolinesEnabled(bool enabled)
 {
   settings::Set(kIsolinesEnabledKey, enabled);
 }

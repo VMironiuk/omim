@@ -135,7 +135,7 @@ std::map<std::string, BookmarkMatchInfo> const kFeatureTypeToBookmarkMatchInfo =
   {"amenity-parking", {kml::BookmarkIcon::Parking, BookmarkBaseType::Parking}},
   {"highway-services", {kml::BookmarkIcon::Parking, BookmarkBaseType::Parking}},
   {"tourism-caravan_site", {kml::BookmarkIcon::Parking, BookmarkBaseType::Parking}},
-  {"vending-parking_tickets", {kml::BookmarkIcon::Parking, BookmarkBaseType::Parking}},
+  {"amenity-vending_machine-parking_tickets", {kml::BookmarkIcon::Parking, BookmarkBaseType::Parking}},
 
   {"amenity-ice_cream", {kml::BookmarkIcon::Shop, BookmarkBaseType::Shop}},
   {"amenity-marketplace", {kml::BookmarkIcon::Shop, BookmarkBaseType::Shop}},
@@ -511,7 +511,7 @@ bool IsMyCategory(User const & user, kml::CategoryData const & categoryData)
   return IsMyCategory(user.GetUserId(), categoryData);
 }
 
-void ExpandBookmarksRectForPreview(m2::RectD & rect)
+void ExpandRectForPreview(m2::RectD & rect)
 {
   if (!rect.IsValid())
     return;

@@ -26,11 +26,11 @@ UNIT_CLASS_TEST(AsyncGuiThread, GuidesOnMap_GetGalleryOnMap)
   {
     guides_on_map::Api api("http://localhost:34568/");
     api.SetDelegate(std::make_unique<DelegateForTesting>());
-    m2::AnyRectD viewport = {};
-    uint8_t zoomlevel = 1;
+    m2::AnyRectD::Corners corners = {};
+    uint8_t zoomLevel = 1;
 
     guides_on_map::GuidesOnMap result{};
-    api.GetGuidesOnMap(viewport, zoomlevel, [&result](guides_on_map::GuidesOnMap const & gallery)
+    api.GetGuidesOnMap(corners, zoomLevel, true, [&result](guides_on_map::GuidesOnMap const & gallery)
                         {
                           result = gallery;
                           testing::Notify();
@@ -41,8 +41,10 @@ UNIT_CLASS_TEST(AsyncGuiThread, GuidesOnMap_GetGalleryOnMap)
                         });
 
     testing::Wait();
-    TEST_EQUAL(result.size(), 2, ());
+    TEST_EQUAL(result.m_nodes.size(), 2, ());
+    TEST_EQUAL(result.m_suggestedZoom, 5, ());
   }
+
   {
     guides_on_map::Api api;
     api.SetDelegate(std::make_unique<DelegateForTesting>());
@@ -50,10 +52,12 @@ UNIT_CLASS_TEST(AsyncGuiThread, GuidesOnMap_GetGalleryOnMap)
     m2::PointD rightBottom = mercator::FromLatLon(55.725608, 37.699851);
     m2::RectD rect(leftTop, rightBottom);
     m2::AnyRectD viewport(rect);
-    uint8_t zoomlevel = 1;
+    m2::AnyRectD::Corners corners;
+    viewport.GetGlobalPoints(corners);
+    uint8_t zoomLevel = 10;
 
     guides_on_map::GuidesOnMap result{};
-    api.GetGuidesOnMap(viewport, zoomlevel, [&result](guides_on_map::GuidesOnMap const & gallery)
+    api.GetGuidesOnMap(corners, zoomLevel, true, [&result](guides_on_map::GuidesOnMap const & gallery)
                         {
                           result = gallery;
                           testing::Notify();
@@ -64,6 +68,6 @@ UNIT_CLASS_TEST(AsyncGuiThread, GuidesOnMap_GetGalleryOnMap)
                         });
 
     testing::Wait();
-    TEST(!result.empty(), ());
+    TEST(!result.m_nodes.empty(), ());
   }
 }

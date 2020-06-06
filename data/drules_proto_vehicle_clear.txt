@@ -18336,6 +18336,22 @@ cont {
     }
     apply_if: "name"
   }
+  element {
+    scale: 19
+    symbol {
+      name: "remains-m"
+      priority: 16764
+    }
+    caption {
+      primary {
+        height: 10
+        color: 4473924
+        offset_y: 1
+      }
+      priority: 15764
+    }
+    apply_if: "!name"
+  }
 }
 cont {
   name: "historic-ship"
@@ -19054,6 +19070,14 @@ cont {
     apply_if: "name"
   }
   element {
+    scale: 12
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
+  }
+  element {
     scale: 13
     area {
       color: 13031851
@@ -19074,6 +19098,14 @@ cont {
       priority: 15094
     }
     apply_if: "name"
+  }
+  element {
+    scale: 13
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
   }
   element {
     scale: 14
@@ -19303,6 +19335,14 @@ cont {
     apply_if: "name"
   }
   element {
+    scale: 12
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
+  }
+  element {
     scale: 13
     area {
       color: 13031851
@@ -19323,6 +19363,14 @@ cont {
       priority: 15094
     }
     apply_if: "name"
+  }
+  element {
+    scale: 13
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
   }
   element {
     scale: 14
@@ -19552,6 +19600,14 @@ cont {
     apply_if: "name"
   }
   element {
+    scale: 12
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
+  }
+  element {
     scale: 13
     area {
       color: 13031851
@@ -19572,6 +19628,14 @@ cont {
       priority: 15094
     }
     apply_if: "name"
+  }
+  element {
+    scale: 13
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
   }
   element {
     scale: 14
@@ -19801,6 +19865,14 @@ cont {
     apply_if: "name"
   }
   element {
+    scale: 12
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
+  }
+  element {
     scale: 13
     area {
       color: 13031851
@@ -19821,6 +19893,14 @@ cont {
       priority: 15094
     }
     apply_if: "name"
+  }
+  element {
+    scale: 13
+    area {
+      color: 13031851
+      priority: -15906
+    }
+    apply_if: "!name"
   }
   element {
     scale: 14
@@ -41566,20 +41646,12 @@ colors {
     color: 6381921
   }
   value {
-    name: "GuideCityMarkOutline"
-    color: 6699455
-  }
-  value {
     name: "GuiText"
     color: 609045837
   }
   value {
     name: "BookmarkRed"
     color: 15014691
-  }
-  value {
-    name: "GuideOutdoorMarkBg"
-    color: 15597546
   }
   value {
     name: "PoiDeletedMask"
@@ -41633,10 +41705,6 @@ colors {
   }
   value {
     name: "TransitTransferOuterMarker"
-  }
-  value {
-    name: "GuideOutdoorMarkOutline"
-    color: 3968060
   }
   value {
     name: "RouteTrafficG1"
@@ -41793,8 +41861,8 @@ colors {
     color: 3422763904
   }
   value {
-    name: "GuideCityMarkBg"
-    color: 16118015
+    name: "DefaultTrackColor"
+    color: 2004720
   }
   value {
     name: "RoutePedestrian"
@@ -41916,6 +41984,10 @@ colors {
     color: 15754290
   }
   value {
+    name: "GuideCityMarkText"
+    color: 6699455
+  }
+  value {
     name: "TrackCarSpeed"
     color: 8163038
   }
@@ -41928,7 +42000,7 @@ colors {
     color: 15790320
   }
   value {
-    name: "DefaultTrackColor"
-    color: 2004720
+    name: "GuideOutdoorMarkText"
+    color: 3968060
   }
 }

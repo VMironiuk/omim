@@ -1,20 +1,17 @@
 package com.mapswithme.maps.widget.menu;
 
-import android.content.Context;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.StringRes;
 import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.mapswithme.maps.R;
 import com.mapswithme.maps.downloader.MapManager;
 import com.mapswithme.maps.downloader.UpdateInfo;
+import com.mapswithme.maps.maplayer.AbstractIsoLinesClickListener;
 import com.mapswithme.maps.maplayer.BottomSheetItem;
 import com.mapswithme.maps.maplayer.DefaultClickListener;
 import com.mapswithme.maps.maplayer.LayersAdapter;
@@ -47,6 +44,7 @@ public class MainMenuRenderer implements MenuRenderer
   @Override
   public void render()
   {
+    mLayersAdapter.notifyDataSetChanged();
     renderDownloadMapsCounter();
   }
 
@@ -71,9 +69,6 @@ public class MainMenuRenderer implements MenuRenderer
     TextView downloadGuides = view.findViewById(R.id.download_guides);
     downloadGuides.setOnClickListener(v -> mListener.onSearchGuidesOptionSelected());
     Graphics.tint(downloadGuides);
-    TextView hotelSearch = view.findViewById(R.id.hotel_search);
-    hotelSearch.setOnClickListener(v -> mListener.onHotelSearchOptionSelected());
-    Graphics.tint(hotelSearch);
     View downloadMapsContainer = view.findViewById(R.id.download_maps_container);
     downloadMapsContainer.setOnClickListener(v -> mListener.onDownloadMapsOptionSelected());
     TextView downloadMaps = downloadMapsContainer.findViewById(R.id.download_maps);
@@ -115,14 +110,6 @@ public class MainMenuRenderer implements MenuRenderer
     mScrollView.scrollTo(0, 0);
   }
 
-  // TODO: use this method to show layer toast.
-  private static void showToast(@NonNull Context context, @StringRes int stringId)
-  {
-    Toast toast = Toast.makeText(context, stringId, Toast.LENGTH_LONG);
-    toast.setGravity(Gravity.TOP, 0, 0);
-    toast.show();
-  }
-
   private class SubwayItemClickListener extends DefaultClickListener
   {
     SubwayItemClickListener()
@@ -151,7 +138,7 @@ public class MainMenuRenderer implements MenuRenderer
     }
   }
 
-  private class IsolinesItemClickListener extends DefaultClickListener
+  private class IsolinesItemClickListener extends AbstractIsoLinesClickListener
   {
     IsolinesItemClickListener()
     {
@@ -161,6 +148,7 @@ public class MainMenuRenderer implements MenuRenderer
     @Override
     public void onItemClickInternal(@NonNull View v, @NonNull BottomSheetItem item)
     {
+      super.onItemClickInternal(v, item);
       mListener.onIsolinesLayerOptionSelected();
     }
   }

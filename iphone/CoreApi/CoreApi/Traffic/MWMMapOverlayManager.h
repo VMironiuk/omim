@@ -27,7 +27,9 @@ typedef NS_ENUM(NSUInteger, MWMMapOverlayIsolinesState) {
 typedef NS_ENUM(NSUInteger, MWMMapOverlayGuidesState) {
   MWMMapOverlayGuidesStateDisabled,
   MWMMapOverlayGuidesStateEnabled,
+  MWMMapOverlayGuidesStateHasData,
   MWMMapOverlayGuidesStateNetworkError,
+  MWMMapOverlayGuidesStateFatalNetworkError,
   MWMMapOverlayGuidesStateNoData,
 } NS_SWIFT_NAME(MapOverlayGuidesState);
 
@@ -58,6 +60,7 @@ NS_SWIFT_NAME(MapOverlayManager)
 + (BOOL)isoLinesEnabled;
 + (BOOL)guidesEnabled;
 + (BOOL)guidesFirstLaunch;
++ (BOOL)isolinesVisible;
 
 + (void)setTrafficEnabled:(BOOL)enable;
 + (void)setTransitEnabled:(BOOL)enable;

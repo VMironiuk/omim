@@ -100,6 +100,7 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
 @property(nonatomic) BOOL deferredFocusValue;
 @property(nonatomic) UIViewController *placePageVC;
 @property(nonatomic) IBOutlet UIView *placePageContainer;
+@property(nonatomic) IBOutlet UIView *guidesCollectionContainer;
 
 @end
 
@@ -113,18 +114,34 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
 #pragma mark - Map Navigation
 
 - (void)showPlacePage {
+  if (!PlacePageData.hasData) {
+    return;
+  }
+  
   self.controlsManager.trafficButtonHidden = YES;
-  self.placePageVC = [PlacePageBuilder build];
-  [self addChildViewController:self.placePageVC];
-  self.placePageContainer.hidden = NO;
-  [self.placePageContainer addSubview:self.placePageVC.view];
+  if (PlacePageData.isGuide) {
+    self.placePageVC = [MWMGuidesGalleryBuilder build];
+    [self.guidesCollectionContainer addSubview:self.placePageVC.view];
+    [NSLayoutConstraint activateConstraints:@[
+      [self.placePageVC.view.topAnchor constraintEqualToAnchor:self.guidesCollectionContainer.topAnchor],
+      [self.placePageVC.view.leftAnchor constraintEqualToAnchor:self.guidesCollectionContainer.leftAnchor],
+      [self.placePageVC.view.bottomAnchor constraintEqualToAnchor:self.guidesCollectionContainer.bottomAnchor],
+      [self.placePageVC.view.rightAnchor constraintEqualToAnchor:self.guidesCollectionContainer.rightAnchor]
+    ]];
+  } else {
+    self.placePageVC = [PlacePageBuilder build];
+    self.placePageContainer.hidden = NO;
+    [self.placePageContainer addSubview:self.placePageVC.view];
+  [self.view bringSubviewToFront:self.placePageContainer];
+    [NSLayoutConstraint activateConstraints:@[
+      [self.placePageVC.view.topAnchor constraintEqualToAnchor:self.placePageContainer.safeAreaLayoutGuide.topAnchor],
+      [self.placePageVC.view.leftAnchor constraintEqualToAnchor:self.placePageContainer.leftAnchor],
+      [self.placePageVC.view.bottomAnchor constraintEqualToAnchor:self.placePageContainer.bottomAnchor],
+      [self.placePageVC.view.rightAnchor constraintEqualToAnchor:self.placePageContainer.rightAnchor]
+    ]];
+  }
   self.placePageVC.view.translatesAutoresizingMaskIntoConstraints = NO;
-  [NSLayoutConstraint activateConstraints:@[
-    [self.placePageVC.view.topAnchor constraintEqualToAnchor:self.placePageContainer.safeAreaLayoutGuide.topAnchor],
-    [self.placePageVC.view.leftAnchor constraintEqualToAnchor:self.placePageContainer.leftAnchor],
-    [self.placePageVC.view.bottomAnchor constraintEqualToAnchor:self.placePageContainer.bottomAnchor],
-    [self.placePageVC.view.rightAnchor constraintEqualToAnchor:self.placePageContainer.rightAnchor]
-  ]];
+  [self addChildViewController:self.placePageVC];
   [self.placePageVC didMoveToParentViewController:self];
 }
 
@@ -144,17 +161,22 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
 - (void)onMapObjectDeselected:(bool)switchFullScreenMode {
   [self hidePlacePage];
 
+  BOOL const isSearchResult = [MWMSearchManager manager].state == MWMSearchManagerStateResult;
+  if (isSearchResult) {
+    [MWMSearchManager manager].state = MWMSearchManagerStateMapSearch;
+  }
+
   if (!switchFullScreenMode)
     return;
 
   if (DeepLinkHandler.shared.isLaunchedByDeeplink)
     return;
 
-  BOOL const isSearchHidden = ([MWMSearchManager manager].state == MWMSearchManagerStateHidden);
-  BOOL const isNavigationDashboardHidden =
-    ([MWMNavigationDashboardManager sharedManager].state == MWMNavigationDashboardStateHidden);
-  if (isSearchHidden && isNavigationDashboardHidden)
+  BOOL const isSearchHidden = [MWMSearchManager manager].state == MWMSearchManagerStateHidden;
+  BOOL const isNavigationDashboardHidden = [MWMNavigationDashboardManager sharedManager].state == MWMNavigationDashboardStateHidden;
+  if (isSearchHidden && isNavigationDashboardHidden) {
     self.controlsManager.hidden = !self.controlsManager.hidden;
+  }
 }
 
 - (void)onMapObjectSelected {
@@ -474,10 +496,9 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
 }
 
 - (void)showUGCAuth {
-  [Statistics logEvent:kStatUGCReviewAuthShown];
   if (IPAD) {
     auto controller = [[MWMAuthorizationViewController alloc] initWithPopoverSourceView:self.controlsManager.anchorView
-                                                                        sourceComponent:MWMAuthorizationSourceUGC
+                                                                                 source:AuthorizationSourceAfterSaveReview
                                                                permittedArrowDirections:UIPopoverArrowDirectionDown
                                                                          successHandler:nil
                                                                            errorHandler:nil
@@ -488,7 +509,7 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
   }
 
   auto controller = [[MWMAuthorizationViewController alloc] initWithBarButtonItem:nil
-                                                                  sourceComponent:MWMAuthorizationSourceUGC
+                                                                           source:AuthorizationSourceAfterSaveReview
                                                                    successHandler:nil
                                                                      errorHandler:nil
                                                                 completionHandler:nil];
@@ -809,6 +830,32 @@ NSString *const kPP2BookmarkEditingSegue = @"PP2BookmarkEditing";
 
 - (void)onBookmarksFileLoadError {
   [[MWMAlertViewController activeAlertController] presentInfoAlert:L(@"load_kmz_title") text:L(@"load_kmz_failed")];
+}
+
+- (BOOL)canBecomeFirstResponder {
+  return YES;
+}
+
+- (NSArray *)keyCommands {
+   return @[[UIKeyCommand keyCommandWithInput:UIKeyInputDownArrow modifierFlags:0 action:@selector(zoomOut) discoverabilityTitle:@"Zoom Out"],
+    [UIKeyCommand keyCommandWithInput:UIKeyInputUpArrow modifierFlags:0 action:@selector(zoomIn) discoverabilityTitle:@"Zoom In"],
+    [UIKeyCommand keyCommandWithInput:UIKeyInputEscape modifierFlags:0 action:@selector(goBack) discoverabilityTitle:@"Go Back"]];
+}
+
+- (void)zoomOut {
+  GetFramework().Scale(Framework::SCALE_MIN, true);
+}
+
+- (void)zoomIn {
+  GetFramework().Scale(Framework::SCALE_MAG, true);
+}
+
+- (void)goBack {
+   NSString *backURL = [DeepLinkHandler.shared getBackUrl];
+   BOOL canOpenURL = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:backURL]];
+   if (canOpenURL){
+     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:backURL] options:@{} completionHandler:nil];
+   }
 }
 
 @end

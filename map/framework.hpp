@@ -215,6 +215,7 @@ protected:
 
   drape_ptr<df::DrapeEngine> m_drapeEngine;
 
+  // Time in seconds.
   double m_startForegroundTime = 0.0;
   double m_startBackgroundTime = 0.0;
 
@@ -785,7 +786,7 @@ public:
   void SaveTransitSchemeEnabled(bool enabled);
 
   bool LoadIsolinesEnabled();
-  void SaveIsolonesEnabled(bool enabled);
+  void SaveIsolinesEnabled(bool enabled);
 
   bool LoadGuidesEnabled();
   void SaveGuidesEnabled(bool enabled);

@@ -24,7 +24,7 @@ void ParseGallery(std::string const & src, guides_on_map::GuidesOnMap & result)
 
   auto const size = json_array_size(dataArray);
 
-  result.reserve(size);
+  result.m_nodes.reserve(size);
   for (size_t i = 0; i < size; ++i)
   {
     guides_on_map::GuidesNode item;
@@ -51,23 +51,34 @@ void ParseGallery(std::string const & src, guides_on_map::GuidesOnMap & result)
       auto & info = item.m_guideInfo;
       FromJSONObject(extraObj, "server_id", info.m_id);
       FromJSONObject(extraObj, "name", info.m_name);
-      FromJSONObject(extraObj, "image_url", info.m_imageUrl);
+      FromJSONObjectOptionalField(extraObj, "image_url", info.m_imageUrl);
       FromJSONObjectOptionalField(extraObj, "tag", info.m_tag);
-      FromJSONObject(extraObj, "bookmarks_count", info.m_bookmarksCount);
+      // TODO(a): revert bookmark_count to required field.
+      FromJSONObjectOptionalField(extraObj, "bookmark_count", info.m_bookmarksCount);
       FromJSONObject(extraObj, "has_track", info.m_hasTrack);
       FromJSONObjectOptionalField(extraObj, "tracks_length", info.m_tracksLength);
-      FromJSONObjectOptionalField(extraObj, "tour_duration", info.m_tourDuration);
-      // Server returns duration in minutes, so convert value to small units.
-      info.m_tourDuration *= 60;
+      auto const durationObj = json_object_get(extraObj, "tour_duration");
+      if (json_is_object(durationObj))
+      {
+        int duration;
+        FromJSONObject(durationObj, "hours", duration);
+        info.m_tourDuration = duration * 60 * 60; // convert hours to seconds
+
+        FromJSONObject(durationObj, "minutes", duration);
+        info.m_tourDuration += duration * 60; // convert minutes to seconds
+      }
       FromJSONObjectOptionalField(extraObj, "ascent", info.m_ascent);
     }
 
-    result.emplace_back(std::move(item));
+    result.m_nodes.emplace_back(std::move(item));
   }
+
+  auto const meta = json_object_get(root.get(), "meta");
+  FromJSONObjectOptionalField(meta, "suggested_zoom_level", result.m_suggestedZoom);
 }
 
-std::string MakeGalleryUrl(std::string const & baseUrl, m2::AnyRectD const & viewport, int zoomLevel,
-                           std::string const & lang)
+std::string MakeGalleryUrl(std::string const & baseUrl, m2::AnyRectD::Corners const & corners,
+                           int zoomLevel, bool suggestZoom, std::string const & lang)
 {
   // Support empty baseUrl for opensource build.
   if (baseUrl.empty())
@@ -75,15 +86,14 @@ std::string MakeGalleryUrl(std::string const & baseUrl, m2::AnyRectD const & vie
 
   url::Params params = {{"zoom_level", strings::to_string(zoomLevel)}, {"locale", lang}};
 
+  if (suggestZoom)
+    params.emplace_back("suggest_zoom_level", "1");
 
   auto const toLatLonFormatted = [](m2::PointD const & point)
   {
     auto const latLon = mercator::ToLatLon(point);
     return strings::to_string_dac(latLon.m_lat, 6) + "," + strings::to_string_dac(latLon.m_lon, 6);
   };
-
-  m2::AnyRectD::Corners corners;
-  viewport.GetGlobalPoints(corners);
 
   ASSERT_EQUAL(corners.size(), 4, ());
 
@@ -118,18 +128,20 @@ void Api::SetDelegate(std::unique_ptr<Delegate> delegate)
   m_delegate = std::move(delegate);
 }
 
-void Api::GetGuidesOnMap(m2::AnyRectD const & viewport, uint8_t zoomLevel,
-                         GuidesOnMapCallback const & onSuccess, OnError const & onError) const
+base::TaskLoop::TaskId Api::GetGuidesOnMap(m2::AnyRectD::Corners const & corners, uint8_t zoomLevel,
+                                           bool suggestZoom, GuidesOnMapCallback const & onSuccess,
+                                           OnError const & onError) const
 {
-  auto const url = MakeGalleryUrl(m_baseUrl, viewport, zoomLevel, languages::GetCurrentNorm());
+  auto const url =
+      MakeGalleryUrl(m_baseUrl, corners, zoomLevel, suggestZoom, languages::GetCurrentNorm());
   if (url.empty())
   {
     onSuccess({});
-    return;
+    return base::TaskLoop::kIncorrectId;
   }
 
   auto const headers = m_delegate->GetHeaders();
-  GetPlatform().RunTask(Platform::Thread::Network, [url, headers, onSuccess, onError]()
+  return GetPlatform().RunTask(Platform::Thread::Network, [url, headers, onSuccess, onError]()
   {
     std::string httpResult;
     if (!GetGalleryRaw(url, headers, httpResult))
@@ -146,7 +158,7 @@ void Api::GetGuidesOnMap(m2::AnyRectD const & viewport, uint8_t zoomLevel,
     catch (Json::Exception const & e)
     {
       LOG(LERROR, (e.Msg(), httpResult));
-      result.clear();
+      result = {};
     }
 
     onSuccess(result);
