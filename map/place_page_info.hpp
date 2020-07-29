@@ -146,6 +146,7 @@ public:
   /// Place traits
   bool IsFeature() const { return m_featureID.IsValid(); }
   bool IsBookmark() const { return m_markGroupId != kml::kInvalidMarkGroupId && m_markId != kml::kInvalidMarkId; }
+  bool IsSearchMark() const { return m_isSearchMark; }
   bool IsTrack() const { return m_trackId != kml::kInvalidTrackId; }
   bool IsMyPosition() const { return m_selectedObject == df::SelectionShape::ESelectedObject::OBJECT_MY_POSITION; }
   bool IsRoutePoint() const { return m_isRoutePoint; }
@@ -209,6 +210,9 @@ public:
   /// Track
   void SetTrackId(kml::TrackId trackId) { m_trackId = trackId; };
   kml::TrackId GetTrackId() const { return m_trackId; };
+
+  /// SearchMark
+  void SetIsSearchMark(bool isSearchMark) { m_isSearchMark = isSearchMark; };
 
   /// Guide
   void SetIsGuide(bool isGuide) { m_isGuide = isGuide; }
@@ -306,7 +310,7 @@ public:
 
   void SetDescription(std::string && description) { m_description = std::move(description); }
 
-  void SetMercator(m2::PointD const & mercator) { m_mercator = mercator; }
+  void SetMercator(m2::PointD const & mercator);
   std::vector<std::string> GetRawTypes() const { return m_types.ToObjectNames(); }
 
   std::optional<ftypes::IsHotelChecker::Type> GetHotelType() const { return m_hotelType; }
@@ -358,6 +362,9 @@ private:
   kml::BookmarkData m_bookmarkData;
   /// If not invalid, track is bound to this place page.
   kml::TrackId m_trackId = kml::kInvalidTrackId;
+
+  /// SearchMark
+  kml::MarkId m_isSearchMark = false;
 
   /// Guide
   bool m_isGuide = false;

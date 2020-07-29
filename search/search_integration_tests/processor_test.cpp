@@ -1059,49 +1059,46 @@ UNIT_CLASS_TEST(ProcessorTest, HotelsFiltering)
   params.m_mode = Mode::Everywhere;
   params.m_suggestsEnabled = false;
 
-  {
+  auto const test = [&](vector<TestHotel> const & matchedHotels) {
     Rules rules = {ExactMatch(id, h1), ExactMatch(id, h2), ExactMatch(id, h3), ExactMatch(id, h4)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+
+    auto request = MakeRequest(params);
+    TEST(ResultsMatch(request->Results(), rules), ());
+    for (auto const & result : request->Results())
+    {
+      FeaturesLoaderGuard loader(m_dataSource, id);
+      auto ft = loader.GetFeatureByIndex(result.GetFeatureID().m_index);
+      TEST(ft, ());
+
+      if (base::AnyOf(matchedHotels, [&](auto const & h) { return h.Matches(*ft); }))
+        TEST(!result.IsRefusedByFilter(), (result));
+      else
+        TEST(result.IsRefusedByFilter(), (result));
+    }
+  };
+
+  test({h1, h2, h3, h4});
 
   using namespace hotels_filter;
 
   params.m_hotelsFilter = And(Gt<Rating>(7.0), Le<PriceRate>(2));
-  {
-    Rules rules = {ExactMatch(id, h1), ExactMatch(id, h3)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h1, h3});
 
   params.m_hotelsFilter = Or(Eq<Rating>(9.0), Le<PriceRate>(4));
-  {
-    Rules rules = {ExactMatch(id, h1), ExactMatch(id, h3), ExactMatch(id, h4)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h1, h3, h4});
 
   params.m_hotelsFilter = Or(And(Eq<Rating>(7.0), Eq<PriceRate>(5)), Eq<PriceRate>(4));
-  {
-    Rules rules = {ExactMatch(id, h2), ExactMatch(id, h4)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h2, h4});
 
   params.m_hotelsFilter = Or(Is(TestHotel::Type::GuestHouse), Is(TestHotel::Type::Hostel));
-  {
-    Rules rules = {ExactMatch(id, h2), ExactMatch(id, h3), ExactMatch(id, h4)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h2, h3, h4});
 
   params.m_hotelsFilter = And(Gt<PriceRate>(3), Is(TestHotel::Type::GuestHouse));
-  {
-    Rules rules = {ExactMatch(id, h4)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h4});
 
   params.m_hotelsFilter = OneOf((1U << static_cast<unsigned>(TestHotel::Type::Hotel)) |
                                 (1U << static_cast<unsigned>(TestHotel::Type::Hostel)));
-  {
-    Rules rules = {ExactMatch(id, h1), ExactMatch(id, h2)};
-    TEST(ResultsMatch(params, rules), ());
-  }
+  test({h1, h2});
 }
 
 UNIT_CLASS_TEST(ProcessorTest, FuzzyMatch)
@@ -1480,11 +1477,15 @@ UNIT_CLASS_TEST(ProcessorTest, PathsThroughLayers)
       vector<m2::PointD>{m2::PointD{-16.0, -16.0}, m2::PointD(0.0, 0.0), m2::PointD(16.0, 16.0)},
       "Computing street", "en");
 
-  TestBuilding statisticalLearningBuilding(m2::PointD(8.0, 8.0), "Statistical Learning, Inc.", "0",
+  TestBuilding statisticalLearningBuilding(m2::PointD(8.0, 8.0),
+                                           "Statistical Learning Buisiness Center", "0",
                                            computingStreet.GetName("en"), "en");
 
-  TestPOI reinforcementCafe(m2::PointD(8.0, 8.0), "Trattoria Reinforcemento", "en");
-  reinforcementCafe.SetTypes({{"amenity", "cafe"}});
+  TestPOI supervisedOffice(m2::PointD(8.0, 8.0), "Supervised, Inc.", "en");
+  supervisedOffice.SetTypes({{"office", "company"}});
+
+  TestPOI svmCafe(m2::PointD(8.0, 8.0), "Trattoria SVM", "en");
+  svmCafe.SetTypes({{"amenity", "cafe"}});
 
   BuildWorld([&](TestMwmBuilder & builder) {
     builder.Add(scienceCountry);
@@ -1495,7 +1496,8 @@ UNIT_CLASS_TEST(ProcessorTest, PathsThroughLayers)
   auto countryId = BuildCountry(countryName, [&](TestMwmBuilder & builder) {
     builder.Add(computingStreet);
     builder.Add(statisticalLearningBuilding);
-    builder.Add(reinforcementCafe);
+    builder.Add(supervisedOffice);
+    builder.Add(svmCafe);
   });
 
   SetViewport(m2::RectD(m2::PointD(-100.0, -100.0), m2::PointD(100.0, 100.0)));
@@ -1511,25 +1513,39 @@ UNIT_CLASS_TEST(ProcessorTest, PathsThroughLayers)
 
     auto const ruleStreet = ExactMatch(countryId, computingStreet);
     auto const ruleBuilding = ExactMatch(countryId, statisticalLearningBuilding);
-    auto const rulePoi = ExactMatch(countryId, reinforcementCafe);
+    auto const rulePoi = ExactMatch(countryId, supervisedOffice);
+    auto const ruleSubpoi = ExactMatch(countryId, svmCafe);
 
-    // POI-BUILDING-STREET
-    TEST(ResultsMatch("computing street statistical learning cafe ", {rulePoi, ruleStreet}), ());
-    TEST(ResultsMatch("computing street 0 cafe ", {rulePoi}), ());
+    // SUBPOI-COMPLEX_POI-BUILDING-STREET
+    TEST(ResultsMatch("computing street 0 supervised cafe ", {ruleSubpoi}), ());
 
-    // POI-BUILDING is not supported
+    // SUBPOI-BUILDING-STREET / COMPLEX_POI-BUILDING-STREET
+    TEST(ResultsMatch("computing street statistical learning cafe ", {ruleSubpoi, ruleStreet}), ());
+    TEST(ResultsMatch("computing street 0 cafe ", {ruleSubpoi}), ());
+    TEST(ResultsMatch("computing street statistical learning office ", {rulePoi, ruleStreet}), ());
+    TEST(ResultsMatch("computing street 0 office ", {rulePoi}), ());
+
+    // COMPLEX_POI-BUILDING / SUBPOI-BUILDING is not supported
     TEST(ResultsMatch("statistical learning cafe ", {}), ());
     TEST(ResultsMatch("0 cafe ", {}), ());
+    TEST(ResultsMatch("statistical learning supervised ", {}), ());
+    TEST(ResultsMatch("0 office ", {}), ());
 
-    // POI-STREET
-    TEST(ResultsMatch("computing street cafe ", {rulePoi, ruleStreet}), ());
+    // COMPLEX_POI-STREET / SUBPOI - STREET
+    TEST(ResultsMatch("computing street cafe ", {ruleSubpoi, ruleStreet}), ());
+    TEST(ResultsMatch("computing street office ", {rulePoi, ruleStreet}), ());
 
     // BUILDING-STREET
     TEST(ResultsMatch("computing street statistical learning ", {ruleBuilding, ruleStreet}), ());
     TEST(ResultsMatch("computing street 0 ", {ruleBuilding}), ());
 
-    // POI
-    TEST(ResultsMatch("cafe ", {rulePoi}), ());
+    // COMPLEX_POI / SUBPOI
+    TEST(ResultsMatch("cafe ", {ruleSubpoi}), ());
+    TEST(ResultsMatch("office ", {rulePoi}), ());
+
+    // COMPLEX_POI-SUBPOI
+    TEST(ResultsMatch("supervised cafe ", {ruleSubpoi}), ());
+    TEST(ResultsMatch("supervised svm ", {ruleSubpoi}), ());
 
     // BUILDING
     TEST(ResultsMatch("statistical learning ", {ruleBuilding}), ());
@@ -2916,6 +2932,167 @@ UNIT_CLASS_TEST(ProcessorTest, StreetWithNumber)
   {
     Rules rules{ExactMatch(countryId, building11), ExactMatch(countryId, street11)};
     TEST(ResultsMatch("11-я Магистральная 11 ", rules), ());
+  }
+}
+
+UNIT_CLASS_TEST(ProcessorTest, SimilarLanguage)
+{
+  string const countryName = "Wonderland";
+
+  auto testLanguage = [&](string language, string searchString, bool expectedRes) {
+    auto request = MakeRequest(searchString, language);
+    auto const & results = request->Results();
+    TEST_EQUAL(results.size(), expectedRes ? 1 : 0, (results, language, searchString, expectedRes));
+  };
+
+  TestMultilingualPOI poi(m2::PointD(0.0, 0.0), "default",
+                          {{"en", "Jiyugaoka Station"},
+                           {"int_name", "international"},
+                           {"ja", "自由が丘"},
+                           {"ja_kana", "じゆうがおか"},
+                           {"ko", "지유가오카"}});
+
+  auto wonderlandId =
+      BuildCountry(countryName, [&](TestMwmBuilder & builder) { builder.Add(poi); });
+
+  SetViewport(m2::RectD(-1, -1, 1, 1));
+
+  // Languages to search: default, English, international, device language (English by default),
+  // languages similar to device language, input language, languages similar to input language.
+
+  // Search must use default, English and international languages for any query locale.
+  testLanguage("it", "default", true);
+  testLanguage("it", "Jiyugaoka Station", true);
+  testLanguage("it", "international", true);
+
+  testLanguage("ja", "自由が丘", true);
+  // ja_kana is similar to ja. Search must use both ja and ja_kana for ja locale.
+  testLanguage("ja", "じゆうがおか", true);
+
+  // ko is not in language list if query locale is not ko.
+  testLanguage("ja", "지유가오카", false);
+  testLanguage("en", "지유가오카", false);
+  // ko is in language list if query locale is ko.
+  testLanguage("ko", "지유가오카", true);
+}
+
+UNIT_CLASS_TEST(ProcessorTest, AltAndOldName)
+{
+  string const countryName = "Wonderland";
+
+  TestMultilingualPOI poi(m2::PointD(0.0, 0.0), "default",
+                          {{"en", "english"}, {"alt_name", "alternative"}, {"old_name", "old"}});
+
+  auto wonderlandId =
+      BuildCountry(countryName, [&](TestMwmBuilder & builder) { builder.Add(poi); });
+
+  SetViewport(m2::RectD(-1, -1, 1, 1));
+  {
+    Rules rules{ExactMatch(wonderlandId, poi)};
+    TEST(ResultsMatch("default", rules), ());
+    TEST(ResultsMatch("english", rules), ());
+    TEST(ResultsMatch("alternative", rules), ());
+    TEST(ResultsMatch("old", rules), ());
+  }
+}
+
+UNIT_CLASS_TEST(ProcessorTest, TestRankingInfo_IsAltOrOldName)
+{
+  string const countryName = "Wonderland";
+
+  StringUtf8Multilang cityName;
+  cityName.AddString("default", "Санкт-Петербург");
+  cityName.AddString("alt_name", "Питер");
+  cityName.AddString("old_name", "Ленинград");
+  TestCity city(m2::PointD(0.0, 0.0), cityName, 100 /* rank */);
+
+  StringUtf8Multilang streetName;
+  streetName.AddString("default", "Большой проспект Васильевского Острова");
+  streetName.AddString("alt_name", "Большой проспект В. О.");
+  streetName.AddString("old_name", "проспект Пролетарской Победы");
+  TestStreet street(
+      vector<m2::PointD>{m2::PointD(0.0, -0.5), m2::PointD(0.0, 0.0), m2::PointD(0.0, 0.5)},
+      streetName);
+
+  TestMultilingualPOI poi(m2::PointD(0.0, 0.0), "KFC",
+                          {{"alt_name", "Kentucky Fried Chicken"}, {"old_name", "Ростикс"}});
+
+  auto worldId = BuildWorld([&](TestMwmBuilder & builder) { builder.Add(city); });
+
+  auto wonderlandId = BuildCountry(countryName, [&](TestMwmBuilder & builder) {
+    builder.Add(city);
+    builder.Add(street);
+    builder.Add(poi);
+  });
+
+  SetViewport(m2::RectD(-1, -1, 1, 1));
+
+  auto checkIsAltOrOldName = [&](string const & query, bool isAltOrOldName) {
+    auto request = MakeRequest(query, "ru");
+    auto const & results = request->Results();
+
+    Rules rules{ExactMatch(wonderlandId, poi)};
+    bool found = false;
+    for (auto const & result : results)
+    {
+      if (ResultsMatch({result}, rules))
+      {
+        found = true;
+        TEST_EQUAL(result.GetRankingInfo().m_nameScore, NAME_SCORE_FULL_MATCH, (query, result));
+        TEST_EQUAL(result.GetRankingInfo().m_isAltOrOldName, isAltOrOldName, (query, result));
+      }
+    }
+    TEST(found, (query));
+  };
+
+  checkIsAltOrOldName("Санкт-Петербург Большой проспект Васильевского Острова KFC", false);
+  checkIsAltOrOldName("Питер Большой проспект Васильевского Острова KFC", true);
+  checkIsAltOrOldName("Ленинград Большой проспект Васильевского Острова KFC", true);
+  checkIsAltOrOldName("Санкт-Петербург Большой проспект В. О. KFC", true);
+  checkIsAltOrOldName("Питер Большой проспект В. О. KFC", true);
+  checkIsAltOrOldName("Ленинград Большой проспект В. О. KFC", true);
+  checkIsAltOrOldName("Санкт-Петербург проспект Пролетарской Победы KFC", true);
+  checkIsAltOrOldName("Питер проспект Пролетарской Победы KFC", true);
+  checkIsAltOrOldName("Ленинград проспект Пролетарской Победы KFC", true);
+  checkIsAltOrOldName(
+      "Санкт-Петербург Большой проспект Васильевского Острова Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Питер Большой проспект Васильевского Острова Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Ленинград Большой проспект Васильевского Острова Kentucky Fried Chicken",
+                      true);
+  checkIsAltOrOldName("Санкт-Петербург Большой проспект В. О. Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Питер Большой проспект В. О. Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Ленинград Большой проспект В. О. Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Санкт-Петербург проспект Пролетарской Победы Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Питер проспект Пролетарской Победы Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Ленинград проспект Пролетарской Победы Kentucky Fried Chicken", true);
+  checkIsAltOrOldName("Санкт-Петербург Большой проспект Васильевского Острова Ростикс", true);
+  checkIsAltOrOldName("Питер Большой проспект Васильевского Острова Ростикс", true);
+  checkIsAltOrOldName("Ленинград Большой проспект Васильевского Острова Ростикс", true);
+  checkIsAltOrOldName("Санкт-Петербург Большой проспект В. О. Ростикс", true);
+  checkIsAltOrOldName("Питер Большой проспект В. О. Ростикс", true);
+  checkIsAltOrOldName("Ленинград Большой проспект В. О. Ростикс", true);
+  checkIsAltOrOldName("Санкт-Петербург проспект Пролетарской Победы Ростикс", true);
+  checkIsAltOrOldName("Питер проспект Пролетарской Победы Ростикс", true);
+  checkIsAltOrOldName("Ленинград проспект Пролетарской Победы Ростикс", true);
+}
+
+UNIT_CLASS_TEST(ProcessorTest, JaKanaNormalizationTest)
+{
+  string const countryName = "Wonderland";
+
+  TestPOI poiHiragana(m2::PointD(0.0, 0.0), "とうきょうと", "default");
+  TestPOI poiKatakana(m2::PointD(1.0, 1.0), "トウキョウト", "default");
+
+  auto countryId = BuildCountry(countryName, [&](TestMwmBuilder & builder) {
+    builder.Add(poiHiragana);
+    builder.Add(poiKatakana);
+  });
+
+  SetViewport(m2::RectD(m2::PointD(0.0, 0.0), m2::PointD(1.0, 1.0)));
+  {
+    Rules rules = {ExactMatch(countryId, poiHiragana), ExactMatch(countryId, poiKatakana)};
+    TEST(ResultsMatch("とうきょうと", rules), ());
+    TEST(ResultsMatch("トウキョウト", rules), ());
   }
 }
 }  // namespace

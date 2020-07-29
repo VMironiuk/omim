@@ -43,6 +43,7 @@ class DownloadMapsViewController: MWMViewController {
     vc.didMove(toParent: self)
     return vc
   }()
+
   lazy var downloadAllView: DownloadAllView = {
     let view = Bundle.main.load(viewClass: DownloadAllView.self)?.first as! DownloadAllView
     view.delegate = self
@@ -219,6 +220,9 @@ class DownloadMapsViewController: MWMViewController {
 
   @objc func onAddMaps() {
     let vc = storyboard!.instantiateViewController(ofType: DownloadMapsViewController.self)
+    if !dataSource.isRoot {
+      vc.dataSource = AvailableMapsDataSource(dataSource.parentAttributes().countryId)
+    }
     vc.mode = .available
     navigationController?.pushViewController(vc, animated: true)
   }
@@ -230,7 +234,7 @@ extension DownloadMapsViewController: UITableViewDataSource {
   func numberOfSections(in tableView: UITableView) -> Int {
     dataSource.numberOfSections() + (hasAddMapSection ? 1 : 0)
   }
-  
+
   func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
     if hasAddMapSection && section == dataSource.numberOfSections() {
       return 1
@@ -239,7 +243,7 @@ extension DownloadMapsViewController: UITableViewDataSource {
   }
 
   func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-    if hasAddMapSection && indexPath.section == dataSource.numberOfSections()  {
+    if hasAddMapSection && indexPath.section == dataSource.numberOfSections() {
       let cellType = MWMMapDownloaderButtonTableViewCell.self
       let buttonCell = tableView.dequeueReusableCell(cell: cellType, indexPath: indexPath)
       return buttonCell
@@ -247,7 +251,7 @@ extension DownloadMapsViewController: UITableViewDataSource {
 
     let nodeAttrs = dataSource.item(at: indexPath)
     let cell: MWMMapDownloaderTableViewCell
-    if dataSource.item(at: indexPath).hasChildren {
+    if nodeAttrs.hasChildren {
       let cellType = MWMMapDownloaderLargeCountryTableViewCell.self
       let largeCountryCell = tableView.dequeueReusableCell(cell: cellType, indexPath: indexPath)
       cell = largeCountryCell
@@ -297,7 +301,7 @@ extension DownloadMapsViewController: UITableViewDataSource {
   }
 
   func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-    if editingStyle == .delete{
+    if editingStyle == .delete {
       let nodeAttrs = dataSource.item(at: indexPath)
       Storage.shared().deleteNode(nodeAttrs.countryId)
     }
@@ -352,19 +356,16 @@ extension DownloadMapsViewController: MWMMapDownloaderTableViewCellDelegate {
   func mapDownloaderCellDidPressProgress(_ cell: MWMMapDownloaderTableViewCell) {
     guard let indexPath = tableView.indexPath(for: cell) else { return }
     let nodeAttrs = dataSource.item(at: indexPath)
-    switch (nodeAttrs.nodeStatus) {
+    switch nodeAttrs.nodeStatus {
     case .undefined, .error:
       Storage.shared().retryDownloadNode(nodeAttrs.countryId)
-      break
     case .downloading, .applying, .inQueue:
       Storage.shared().cancelDownloadNode(nodeAttrs.countryId)
       Statistics.logEvent(kStatDownloaderDownloadCancel, withParameters: [kStatFrom: kStatMap])
-      break
     case .onDiskOutOfDate:
       Storage.shared().updateNode(nodeAttrs.countryId)
-      break
     case .onDisk:
-      //do nothing
+      // do nothing
       break
     case .notDownloaded, .partly:
       if nodeAttrs.hasChildren {
@@ -372,7 +373,6 @@ extension DownloadMapsViewController: MWMMapDownloaderTableViewCellDelegate {
       } else {
         Storage.shared().downloadNode(nodeAttrs.countryId)
       }
-      break
     @unknown default:
       fatalError()
     }
@@ -450,12 +450,12 @@ extension DownloadMapsViewController: UISearchBarDelegate {
     searchBar.resignFirstResponder()
     dataSource.cancelSearch()
     reloadData()
-    self.noSerchResultViewController.view.isHidden = true
+    noSerchResultViewController.view.isHidden = true
   }
 
   func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
     let locale = searchBar.textInputMode?.primaryLanguage
-    dataSource.search(searchText, locale: locale ?? "") { [weak self] (finished) in
+    dataSource.search(searchText, locale: locale ?? "") { [weak self] finished in
       guard let self = self else { return }
       self.reloadData()
       self.noSerchResultViewController.view.isHidden = !self.dataSource.isEmpty
@@ -492,14 +492,14 @@ extension DownloadMapsViewController: DownloadAllViewDelegate {
       Storage.shared().downloadNode(dataSource.parentAttributes().countryId)
     }
     skipCountryEvent = false
-    self.processCountryEvent(dataSource.parentAttributes().countryId)
+    processCountryEvent(dataSource.parentAttributes().countryId)
   }
 
   func onRetryButtonPressed() {
     skipCountryEvent = true
     Storage.shared().retryDownloadNode(dataSource.parentAttributes().countryId)
     skipCountryEvent = false
-    self.processCountryEvent(dataSource.parentAttributes().countryId)
+    processCountryEvent(dataSource.parentAttributes().countryId)
   }
 
   func onCancelButtonPressed() {
@@ -507,7 +507,7 @@ extension DownloadMapsViewController: DownloadAllViewDelegate {
     Storage.shared().cancelDownloadNode(dataSource.parentAttributes().countryId)
     Statistics.logEvent(kStatDownloaderDownloadCancel, withParameters: [kStatFrom: kStatMap])
     skipCountryEvent = false
-    self.processCountryEvent(dataSource.parentAttributes().countryId)
+    processCountryEvent(dataSource.parentAttributes().countryId)
     reloadData()
   }
 }

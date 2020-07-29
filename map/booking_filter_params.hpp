@@ -1,11 +1,12 @@
 #pragma once
 
+#include "partners_api/booking_api.hpp"
 #include "partners_api/booking_availability_params.hpp"
 #include "partners_api/booking_params_base.hpp"
 
-#include "platform/safe_callback.hpp"
-
 #include "indexer/feature_decl.hpp"
+
+#include "platform/safe_callback.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -24,8 +25,36 @@ namespace filter
 {
 using Results = platform::SafeCallback<void(std::shared_ptr<ParamsBase> const & params,
                                             std::vector<FeatureID> const & sortedFeatures)>;
-using ResultsUnsafe = std::function<void(search::Results const & results)>;
-using ResultsRawUnsafe = std::function<void(std::vector<FeatureID> const & results)>;
+
+enum class Type
+{
+  Deals,
+  Availability
+};
+
+using Types = std::vector<Type>;
+
+// Note: do not add any methods, this structue
+// is used in inheritance of structures as base.
+template <typename T>
+struct ResultInternal
+{
+  ResultInternal() = default;
+
+  ResultInternal(T && passedFilter, std::vector<Extras> && extras, T && filteredOut)
+  : m_passedFilter(std::move(passedFilter))
+  , m_extras(std::move(extras))
+  , m_filteredOut(std::move(filteredOut))
+  {
+  }
+
+  T m_passedFilter;
+  std::vector<Extras> m_extras;
+  T m_filteredOut;
+};
+
+using ResultsUnsafe = std::function<void(ResultInternal<search::Results> && result)>;
+using ResultsRawUnsafe = std::function<void(ResultInternal<std::vector<FeatureID>> && result)>;
 
 template <typename R>
 struct ParamsImpl
@@ -46,14 +75,6 @@ struct ParamsImpl
 using Params = ParamsImpl<Results>;
 using ParamsInternal = ParamsImpl<ResultsUnsafe>;
 using ParamsRawInternal = ParamsImpl<ResultsRawUnsafe>;
-
-enum class Type
-{
-  Deals,
-  Availability
-};
-
-using Types = std::vector<Type>;
 
 template <typename T>
 struct TaskImpl

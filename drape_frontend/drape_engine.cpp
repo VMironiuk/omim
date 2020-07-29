@@ -205,6 +205,14 @@ void DrapeEngine::Rotate(double azimuth, bool isAnim)
   AddUserEvent(make_unique_dp<RotateEvent>(azimuth, isAnim, nullptr /* parallelAnimCreator */));
 }
 
+void DrapeEngine::ScaleAndSetCenter(m2::PointD const & centerPt, double scaleFactor, bool isAnim,
+                                    bool trackVisibleViewport)
+{
+  PostUserEvent(make_unique_dp<SetCenterEvent>(scaleFactor, centerPt, isAnim,
+                                               trackVisibleViewport,
+                                               nullptr /* parallelAnimCreator */));
+}
+
 void DrapeEngine::SetModelViewCenter(m2::PointD const & centerPt, int zoom, bool isAnim,
                                      bool trackVisibleViewport)
 {
@@ -718,10 +726,17 @@ void DrapeEngine::SetKineticScrollEnabled(bool enabled)
                                   MessagePriority::Normal);
 }
 
-void DrapeEngine::SetTimeInBackground(double time)
+void DrapeEngine::OnEnterForeground(double backgroundTime)
 {
   m_threadCommutator->PostMessage(ThreadsCommutator::RenderThread,
-                                  make_unique_dp<SetTimeInBackgroundMessage>(time),
+                                  make_unique_dp<OnEnterForegroundMessage>(backgroundTime),
+                                  MessagePriority::High);
+}
+
+void DrapeEngine::OnEnterBackground()
+{
+  m_threadCommutator->PostMessage(ThreadsCommutator::RenderThread,
+                                  make_unique_dp<OnEnterBackgroundMessage>(),
                                   MessagePriority::High);
 }
 
@@ -907,7 +922,11 @@ drape_ptr<UserMarkRenderParams> DrapeEngine::GenerateMarkRenderInfo(UserPointMar
   auto renderInfo = make_unique_dp<UserMarkRenderParams>();
   renderInfo->m_anchor = mark->GetAnchor();
   renderInfo->m_depthTestEnabled = mark->GetDepthTestEnabled();
-  renderInfo->m_depth = mark->GetDepth();
+  if (mark->GetDepth() != UserPointMark::kInvalidDepth)
+  {
+    renderInfo->m_depth = mark->GetDepth();
+    renderInfo->m_customDepth = true;
+  }
   renderInfo->m_depthLayer = mark->GetDepthLayer();
   renderInfo->m_minZoom = mark->GetMinZoom();
   renderInfo->m_minTitleZoom = mark->GetMinTitleZoom();

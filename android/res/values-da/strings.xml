@@ -1790,8 +1790,10 @@
 	<string name="connection_error_dialog_guides_try">Prøv igen</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Sluk</string>
 	<string name="connection_error_toast_guides">Forsøger at tilslutte</string>
-	<string name="routes_card_show">Vis</string>
-	<string name="routes_card_hide">Skjul</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Vis på kort</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Skjul fra kort</string>
 	<string name="whatsnew_catalog_new_title">Nyt guide katalog og rejseidéer</string>
 	<string name="whatsnew_catalog_new_message">Vi har opdateret guide kataloget og tilføjet oversættelser på alle sprog. Påbegynd planlægning på forhånd!</string>
 	<string name="whatsnew_elevation_profile_title">Højdeprofil i rejseguides</string>
@@ -1881,6 +1883,15 @@
 	<string name="type.amenity.pub">Værtshus</string>
 	<string name="type.amenity.public_bookcase">Bog udveksling</string>
 	<string name="type.amenity.recycling">Genbrugsplads</string>
+	<string name="type.amenity.recycling_container">Genbrugscontainer</string>
+	<string name="type.recycling.toxic">Giftigt affald</string>
+	<string name="type.recycling.clothes">Gammelt tøj</string>
+	<string name="type.recycling.glass_bottles">Glasflasker</string>
+	<string name="type.recycling.paper">Papiraffald</string>
+	<string name="type.recycling.plastic">Plastaffald</string>
+	<string name="type.recycling.plastic_bottles">Plastik flasker</string>
+	<string name="type.recycling.scrap_metal">Skrot metal</string>
+	<string name="type.recycling.small_appliances">Elektronik affald</string>
 	<string name="type.amenity.school">Skole</string>
 	<string name="type.amenity.shower">Bruser</string>
 	<string name="type.amenity.telephone">Telefon</string>
@@ -2021,6 +2032,7 @@
 	<string name="type.highway.footway.mountain_hiking">Sti</string>
 	<string name="type.highway.footway.permissive">Sti</string>
 	<string name="type.highway.footway.tunnel">Sti</string>
+	<string name="type.highway.ford">Vadested</string>
 	<string name="type.highway.living_street">Gade</string>
 	<string name="type.highway.living_street.bridge">Gade</string>
 	<string name="type.highway.living_street.tunnel">Gade</string>

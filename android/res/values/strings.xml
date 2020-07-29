@@ -1858,8 +1858,10 @@
 	<string name="connection_error_dialog_guides_try">Try again</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Turn off</string>
 	<string name="connection_error_toast_guides">Trying to reconnect</string>
-	<string name="routes_card_show">Show</string>
-	<string name="routes_card_hide">Hide</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Show on map</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Hide from map</string>
 	<string name="whatsnew_catalog_new_title">New guides catalog and thousands of travel ideas</string>
 	<string name="whatsnew_catalog_new_message">We have updated the guides catalog and added translations in all languages. Start planning in advance!</string>
 	<string name="whatsnew_elevation_profile_title">Elevation profile in travel guides</string>
@@ -1874,6 +1876,37 @@
 	<string name="routes_card_number_of_points">%s places</string>
 	<string name="routes_card_routes_tag">Itinerary</string>
 	<string name="routes_card_set_tag">Featured places</string>
+	<!-- FIXME -->
+	<string name="guides_trial_cta_button">guides_trial_cta_button</string>
+	<!-- FIXME -->
+	<string name="guides_trial_message">guides_trial_message%s</string>
+	<!-- FIXME -->
+	<string name="trial_error_dialog">trial_error_dialog</string>
+	<!-- FIXME -->
+	<string name="floating_button_filters">Filters</string>
+	<!-- FIXME -->
+	<plurals name="date_picker_amout_of_days">
+	  <item quantity="one">%d day</item>
+	  <item quantity="other">%d days</item>
+	</plurals>
+	<!-- FIXME -->
+	<string name="date_picker_сhoose_dates_cta">Choose dates</string>
+	<!-- FIXME -->
+	<string name="guests_picker_rooms">Rooms</string>
+	<!-- FIXME -->
+	<string name="guests_picker_adults">Adults</string>
+	<!-- FIXME -->
+	<string name="guests_picker_children_title">Children</string>
+	<!-- FIXME -->
+	<string name="guests_picker_children_subtitle">3-16 y.o.</string>
+	<!-- FIXME -->
+	<string name="guests_picker_infants_title">Infants</string>
+	<!-- FIXME -->
+	<string name="guests_picker_infants_subtitle">0-3 y.o.</string>
+	<!-- FIXME -->
+	<string name="booking_map_component_availability">No rooms</string>
+	<!-- FIXME -->
+	<string name="booking_map_component_filters">Out of filters</string>
 
 	<!-- SECTION:  Partners  -->
 	<string name="sponsored_partner1_action">Outlets</string>
@@ -2284,6 +2317,7 @@
 	<string name="type.historic.wayside_shrine">historic-wayside_shrine</string>
 	<string name="type.hwtag">hwtag</string>
 	<string name="type.hwtag.bidir_bicycle">hwtag-bidir_bicycle</string>
+	<string name="type.hwtag.onedir_bicycle">hwtag-onedir_bicycle</string>
 	<string name="type.hwtag.lit">hwtag-lit</string>
 	<string name="type.hwtag.nobicycle">hwtag-nobicycle</string>
 	<string name="type.hwtag.nocar">hwtag-nocar</string>

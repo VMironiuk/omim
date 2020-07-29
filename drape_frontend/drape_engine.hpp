@@ -139,6 +139,9 @@ public:
   void Move(double factorX, double factorY, bool isAnim);
   void Rotate(double azimuth, bool isAnim);
 
+  void ScaleAndSetCenter(m2::PointD const & centerPt, double scaleFactor, bool isAnim,
+                         bool trackVisibleViewport);
+
   // If zoom == -1 then current zoom will not be changed.
   void SetModelViewCenter(m2::PointD const & centerPt, int zoom, bool isAnim,
                           bool trackVisibleViewport);
@@ -209,7 +212,8 @@ public:
 
   void SetKineticScrollEnabled(bool enabled);
 
-  void SetTimeInBackground(double time);
+  void OnEnterForeground(double backgroundTime);
+  void OnEnterBackground();
 
   void SetDisplacementMode(int mode);
 

@@ -31,10 +31,14 @@ DECLARE_EXCEPTION(NoHeader, XMLFeatureError);
 class XMLFeature
 {
   static constexpr char const * kDefaultName = "name";
-  static constexpr char const * kIntlName = "int_name";
   static constexpr char const * kLocalName = "name:";
-  static char const * const kDefaultLang;
-  static char const * const kIntlLang;
+  static constexpr char const * kIntlName = "int_name";
+  static constexpr char const * kAltName = "alt_name";
+  static constexpr char const * kOldName = "old_name";
+  static constexpr char const * kDefaultLang = "default";
+  static constexpr char const * kIntlLang = kIntlName;
+  static constexpr char const * kAltLang = kAltName;
+  static constexpr char const * kOldLang = kOldName;
 
 public:
   // Used in point to string serialization.

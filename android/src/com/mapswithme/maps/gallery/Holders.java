@@ -16,6 +16,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.CallSuper;
+import androidx.annotation.ColorInt;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.drawable.RoundedBitmapDrawable;
@@ -588,7 +590,7 @@ public class Holders
     @NonNull
     private final TextView mBoughtContentBtn;
     @NonNull
-    private final View mBoughtContentCheckbox;
+    private final ImageView mBoughtContentCheckbox;
 
     public GuideHodler(@NonNull View itemView, @NonNull List<GuidesGallery.Item> items, @Nullable ItemSelectedListener<GuidesGallery.Item> listener)
     {
@@ -629,7 +631,6 @@ public class Holders
     {
       super.bind(item);
       bindImage(item);
-      bindActivationState(item);
       bindSubtitle(item);
       bindBottomBlock(item);
       bindActivationState(item);
@@ -658,6 +659,13 @@ public class Holders
       BookmarkCategory category =
           BookmarkManager.INSTANCE.getCategoryByServerId(item.getGuideId());
       mBoughtContentBtn.setText(category.isVisible() ? R.string.hide : R.string.show);
+      boolean isCity = item.getGuideType() == GuidesGallery.Type.City;
+      Context context = mBoughtContentBtn.getContext();
+      @DrawableRes
+      int drawableRes =
+          ThemeUtils.getResource(context, isCity ? R.attr.cityCheckbox
+                                                 : R.attr.outdoorCheckbox);
+      mBoughtContentCheckbox.setImageResource(drawableRes);
     }
 
     private void bindOutdoorBlock(@NonNull GuidesGallery.OutdoorParams params)
@@ -679,8 +687,10 @@ public class Holders
 
       Context context = mAltitide.getContext();
       String poiCount = String.valueOf(cityParams.getBookmarksCount());
-      String text = context.getString(R.string.routes_card_number_of_points, poiCount)
-                    + " " + context.getString(R.string.routes_card_plus_track);
+      String text = context.getString(R.string.routes_card_number_of_points, poiCount);
+      if (cityParams.isTrackAvailable())
+        text += " " + context.getString(R.string.routes_card_plus_track);
+
       mDesc.setText(text);
     }
 
@@ -720,16 +730,19 @@ public class Holders
     }
 
     @NonNull
-    private static Spannable makeSubtitle(Context context, @NonNull GuidesGallery.Item item)
+    private static Spannable makeSubtitle(@NonNull Context context,
+                                          @NonNull GuidesGallery.Item item)
     {
       boolean isCity = item.getGuideType() == GuidesGallery.Type.City;
       SpannableStringBuilder builder =
-          new SpannableStringBuilder(isCity ? context.getString(R.string.type_place_city)
-                                            : context.getString(R.string.type_shop_outdoor));
+          new SpannableStringBuilder(isCity ? context.getString(R.string.routes_card_city)
+                                            : context.getString(R.string.routes_card_outdoor));
 
       Resources res = context.getResources();
-      int color = isCity ? res.getColor(R.color.city_color)
-                         : res.getColor(R.color.outdoor_color);
+
+      @ColorInt
+      int color = isCity ? ThemeUtils.getColor(context, R.attr.subtitleCityColor)
+                         : ThemeUtils.getColor(context, R.attr.subtitleOutdoorColor);
 
       builder.setSpan(new ForegroundColorSpan(color), 0, builder.length(),
                       Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -743,7 +756,7 @@ public class Holders
                                         .getString()) ? "" : item.getOutdoorParams()
                                                                  .getString();
 
-      builder.append(TextUtils.isEmpty(text) ? text : UiUtils.PHRASE_SEPARATOR + text);
+      builder.append(TextUtils.isEmpty(text) ? text : UiUtils.WIDE_PHRASE_SEPARATOR + text);
       return builder;
     }
   }

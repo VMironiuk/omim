@@ -1467,7 +1467,7 @@
 	<string name="dialog_routing_rebuild_from_current_location_carplay">Rute vil planlegges fra din nåværende posisjon</string>
 	<string name="dialog_routing_rebuild_for_vehicle_carplay">Rute vil oppdateres til kjørerute</string>
 	<string name="ok">Ok</string>
-	<string name="booking_button_toolbar">Finne en hotell på kortet</string>
+	<string name="booking_button_toolbar">Finne et hotell på kartet</string>
 	<string name="popup_booking_download_guides_title">Du har booket en hotell?</string>
 	<string name="popup_booking_download_guides_message">Planlegg en rute ved hjelp av ferdige guider fra MAPS.ME</string>
 	<string name="popup_mwm_download_guides_title">Uten nett-guider</string>
@@ -1679,8 +1679,10 @@
 	<string name="connection_error_dialog_guides_try">Prøve på nytt</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Slå av</string>
 	<string name="connection_error_toast_guides">Prøver å koble til på nytt</string>
-	<string name="routes_card_show">Vise</string>
-	<string name="routes_card_hide">Skjule</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Vise på kartet</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Skjule fra kartet</string>
 	<string name="whatsnew_catalog_new_title">Ny katalog med tusenvis av ferieideer</string>
 	<string name="whatsnew_catalog_new_message">Vi har oppdatert guidekatalogen vår og lagt til oversettelser til alle språk. Begynn å planlegge på forhånd!</string>
 	<string name="whatsnew_elevation_profile_title">Høydeprofil i guidene</string>
@@ -1770,6 +1772,15 @@
 	<string name="type.amenity.post_office">Postkontor</string>
 	<string name="type.amenity.public_bookcase">Bokhylle</string>
 	<string name="type.amenity.recycling">Resirkuleringssenter</string>
+	<string name="type.amenity.recycling_container">Gjenvinningsbeholder</string>
+	<string name="type.recycling.toxic">Giftig avfall</string>
+	<string name="type.recycling.clothes">Gamle klær</string>
+	<string name="type.recycling.glass_bottles">Glassemballasje</string>
+	<string name="type.recycling.paper">Papiravfall</string>
+	<string name="type.recycling.plastic">Plastavfall</string>
+	<string name="type.recycling.plastic_bottles">Plastflasker</string>
+	<string name="type.recycling.scrap_metal">Metallavfall</string>
+	<string name="type.recycling.small_appliances">Elektronisk avfall</string>
 	<string name="type.amenity.school">Skole</string>
 	<string name="type.amenity.shelter">Tilfluktsrom</string>
 	<string name="type.amenity.shower">Dusj</string>
@@ -1914,6 +1925,7 @@
 	<string name="type.highway.footway.mountain_hiking">Sti</string>
 	<string name="type.highway.footway.permissive">Sti</string>
 	<string name="type.highway.footway.tunnel">Sti</string>
+	<string name="type.highway.ford">Vadested</string>
 	<string name="type.highway.living_street">Gate</string>
 	<string name="type.highway.living_street.bridge">Gate</string>
 	<string name="type.highway.living_street.tunnel">Gate</string>

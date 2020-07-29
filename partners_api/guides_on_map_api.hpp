@@ -43,8 +43,10 @@ struct GuidesNode
 
 struct GuidesOnMap
 {
+  static uint8_t constexpr kIncorrectZoom = 0;
+
   std::vector<GuidesNode> m_nodes;
-  uint8_t m_suggestedZoom = 0;
+  uint8_t m_suggestedZoom = kIncorrectZoom;
 };
 
 using GuidesOnMapCallback = platform::SafeCallback<void(GuidesOnMap const & gallery)>;
@@ -66,7 +68,8 @@ public:
   void SetDelegate(std::unique_ptr<Delegate> delegate);
 
   base::TaskLoop::TaskId GetGuidesOnMap(m2::AnyRectD::Corners const & corners, uint8_t zoomLevel,
-                                        bool suggestZoom, GuidesOnMapCallback const & onSuccess,
+                                        bool suggestZoom, uint8_t rectIncreasedPercent,
+                                        GuidesOnMapCallback const & onSuccess,
                                         OnError const & onError) const;
 
 private:

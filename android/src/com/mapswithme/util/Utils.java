@@ -557,6 +557,18 @@ public class Utils
     return null;
   }
 
+  @NonNull
+  public static String getCountryCode()
+  {
+    return Locale.getDefault().getCountry();
+  }
+
+  @NonNull
+  public static String getLanguageCode()
+  {
+    return Locale.getDefault().getLanguage();
+  }
+
   @Nullable
   public static Currency getCurrencyForLocale(@NonNull Locale locale)
   {
@@ -602,6 +614,21 @@ public class Utils
       text = (price + " " + currencyCode);
     }
     return text;
+  }
+
+  @NonNull
+  public static String getCurrencySymbol(@NonNull String currencyCode)
+  {
+    try
+    {
+      return Currency.getInstance(currencyCode).getSymbol(Locale.getDefault());
+    }
+    catch (Throwable e)
+    {
+      LOGGER.e(TAG, "Failed to obtain currency symbol by currency code = " + currencyCode, e);
+    }
+    
+    return currencyCode;
   }
 
   static String makeUrlSafe(@NonNull final String url)

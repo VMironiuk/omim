@@ -88,10 +88,6 @@ void ValidateElement(pugi::xml_node const & nodeOrWay)
 
 namespace editor
 {
-char const * const XMLFeature::kDefaultLang =
-    StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kDefaultCode);
-char const * const XMLFeature::kIntlLang =
-    StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kInternationalCode);
 
 XMLFeature::XMLFeature(Type const type)
 {
@@ -237,8 +233,16 @@ vector<m2::PointD> XMLFeature::GetGeometry() const
 
 string XMLFeature::GetName(string const & lang) const
 {
+  ASSERT_EQUAL(kDefaultLang, StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kDefaultCode), ());
+  ASSERT_EQUAL(kIntlLang, StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kInternationalCode), ());
+  ASSERT_EQUAL(kAltLang, StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kAltNameCode), ());
+  ASSERT_EQUAL(kOldLang, StringUtf8Multilang::GetLangByCode(StringUtf8Multilang::kOldNameCode), ());
   if (lang == kIntlLang)
     return GetTagValue(kIntlName);
+  if (lang == kAltLang)
+    return GetTagValue(kAltName);
+  if (lang == kOldLang)
+    return GetTagValue(kOldName);
   auto const suffix = (lang == kDefaultLang || lang.empty()) ? "" : ":" + lang;
   return GetTagValue(kDefaultName + suffix);
 }
@@ -253,7 +257,17 @@ void XMLFeature::SetName(string const & name) { SetName(kDefaultLang, name); }
 void XMLFeature::SetName(string const & lang, string const & name)
 {
   if (lang == kIntlLang)
+  {
     SetTagValue(kIntlName, name);
+  }
+  else if (lang == kAltLang)
+  {
+    SetTagValue(kAltName, name);
+  }
+  else if (lang == kOldLang)
+  {
+    SetTagValue(kOldName, name);
+  }
   else
   {
     auto const suffix = (lang == kDefaultLang || lang.empty()) ? "" : ":" + lang;

@@ -1784,8 +1784,10 @@
 	<string name="connection_error_dialog_guides_try">再试一次</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">关闭</string>
 	<string name="connection_error_toast_guides">恢复网络连接</string>
-	<string name="routes_card_show">显示</string>
-	<string name="routes_card_hide">隐藏</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">在地图上显示</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">在地图上隐藏</string>
 	<string name="whatsnew_catalog_new_title">新目录和数千个理想度假胜地</string>
 	<string name="whatsnew_catalog_new_message">我们更新了指南目录，并添加了所有语言的翻译。开始提前计划！</string>
 	<string name="whatsnew_elevation_profile_title">指导中的高度剖面图</string>
@@ -1879,6 +1881,15 @@
 	<string name="type.amenity.pub">酒馆</string>
 	<string name="type.amenity.public_bookcase">书架</string>
 	<string name="type.amenity.recycling">回收中心</string>
+	<string name="type.amenity.recycling_container">回收箱</string>
+	<string name="type.recycling.toxic">有毒垃圾</string>
+	<string name="type.recycling.clothes">旧衣物</string>
+	<string name="type.recycling.glass_bottles">玻璃瓶</string>
+	<string name="type.recycling.paper">废纸</string>
+	<string name="type.recycling.plastic">废塑料</string>
+	<string name="type.recycling.plastic_bottles">塑料瓶</string>
+	<string name="type.recycling.scrap_metal">废金属</string>
+	<string name="type.recycling.small_appliances">电子垃圾</string>
 	<string name="type.amenity.restaurant">餐厅</string>
 	<string name="type.amenity.school">学校</string>
 	<string name="type.amenity.shelter">庇护所</string>
@@ -2024,6 +2035,7 @@
 	<string name="type.highway.footway.mountain_hiking">路径</string>
 	<string name="type.highway.footway.permissive">路径</string>
 	<string name="type.highway.footway.tunnel">路径</string>
+	<string name="type.highway.ford">浅滩</string>
 	<string name="type.highway.living_street">街头</string>
 	<string name="type.highway.living_street.bridge">街头</string>
 	<string name="type.highway.living_street.tunnel">街头</string>
@@ -2330,7 +2342,7 @@
 	<string name="type.shop.tyres">轮胎店</string>
 	<string name="type.shop.variety_store">杂货店</string>
 	<string name="type.shop.video">商店</string>
-	<string name="type.shop.wine">酒店</string>
+	<string name="type.shop.wine">贩酒处</string>
 	<string name="type.sport.athletics">田径</string>
 	<string name="type.sport.basketball">篮球</string>
 	<string name="type.sport.equestrian">马术运动</string>

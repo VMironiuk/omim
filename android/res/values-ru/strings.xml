@@ -1358,7 +1358,7 @@
 	<string name="opt_out_help_ios_1">Вы можете отказаться от получения целевой рекламы в настройках устройства.</string>
 	<string name="opt_out_help_ios_2">iOS 9 или выше</string>
 	<string name="opt_out_help_ios_3">Откройте Настройки → Конфиденциальность → Реклама → Включите «Ограничение трекинга»</string>
-	<string name="opt_out_help_android">Вы можете отказаться от получения целевой рекламы в настройках устройства.\nAndroid и Google Play Сервисы 4.0 и выше\n\nНастройки телефона → Google → Реклама → Отключить персонализацию рекламы\nили\nНастройки телефона → Google → Аккаунт Google → Конфиденциальность → Настройки реламных предпочтений → Персонализация рекламы</string>
+	<string name="opt_out_help_android">Вы можете отказаться от получения целевой рекламы в настройках устройства.\nAndroid и Google Play Сервисы 4.0 и выше\n\nНастройки телефона → Google → Реклама → Отключить персонализацию рекламы\nили\nНастройки телефона → Google → Аккаунт Google → Конфиденциальность → Настройки рекламных предпочтений → Персонализация рекламы</string>
 	<string name="privacy_policy">Политика конфиденциальности</string>
 	<string name="terms_of_use">Условия использования</string>
 	<string name="backup_notification_failed">Резервное копирование меток было приостановлено. Войдите, чтобы включить резервное копирование.</string>
@@ -1832,8 +1832,10 @@
 	<string name="connection_error_dialog_guides_try">Попробовать снова</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Выключить</string>
 	<string name="connection_error_toast_guides">Восстанавливаем соединение</string>
-	<string name="routes_card_show">Показать</string>
-	<string name="routes_card_hide">Скрыть</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Показать на карте</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Скрыть с карты</string>
 	<string name="whatsnew_catalog_new_title">Новый каталог и тысячи идей для отдыха</string>
 	<string name="whatsnew_catalog_new_message">Мы обновили каталог путеводителей и добавили переводы на все языки. Начните планировать заранее!</string>
 	<string name="whatsnew_elevation_profile_title">Профиль высот в путеводителях</string>
@@ -1846,6 +1848,12 @@
 	<string name="routes_card_number_of_points">%s мест</string>
 	<string name="routes_card_routes_tag">Маршрут</string>
 	<string name="routes_card_set_tag">Подборка мест</string>
+	<!-- FIXME -->
+	<plurals name="date_picker_amout_of_days">
+	  <item quantity="one">%d день</item>
+	  <item quantity="few">%d дня</item>
+	  <item quantity="other">%dдней</item>
+	</plurals>
 
 	<!-- SECTION:  Partners  -->
 	<string name="sponsored_partner1_action">Аутлеты</string>

@@ -29,6 +29,7 @@
 #include "indexer/feature_covering.hpp"
 #include "indexer/feature_data.hpp"
 #include "indexer/feature_impl.hpp"
+#include "indexer/feature_utils.hpp"
 #include "indexer/features_vector.hpp"
 #include "indexer/ftypes_matcher.hpp"
 #include "indexer/postcodes_matcher.hpp"
@@ -76,6 +77,7 @@ enum LanguageTier
   LANGUAGE_TIER_INPUT,
   LANGUAGE_TIER_EN_AND_INTERNATIONAL,
   LANGUAGE_TIER_DEFAULT,
+  LANGUAGE_TIER_ALT_AND_OLD,
   LANGUAGE_TIER_COUNT
 };
 
@@ -176,6 +178,9 @@ Processor::Processor(DataSource const & dataSource, CategoriesHolder const & cat
       {StringUtf8Multilang::kInternationalCode, StringUtf8Multilang::kEnglishCode});
   m_keywordsScorer.SetLanguages(LanguageTier::LANGUAGE_TIER_DEFAULT,
                                 {StringUtf8Multilang::kDefaultCode});
+  m_keywordsScorer.SetLanguages(
+      LanguageTier::LANGUAGE_TIER_ALT_AND_OLD,
+      {StringUtf8Multilang::kAltNameCode, StringUtf8Multilang::kOldNameCode});
 
   SetPreferredLocale("en");
 }
@@ -202,7 +207,7 @@ void Processor::SetPreferredLocale(string const & locale)
   LOG(LINFO, ("New preferred locale:", locale));
 
   int8_t const code = StringUtf8Multilang::GetLangIndex(languages::Normalize(locale));
-  m_keywordsScorer.SetLanguages(LanguageTier::LANGUAGE_TIER_CURRENT, {code});
+  m_keywordsScorer.SetLanguages(LanguageTier::LANGUAGE_TIER_CURRENT, feature::GetSimilar(code));
 
   m_currentLocaleCode = CategoriesHolder::MapLocaleToInteger(locale);
 
@@ -219,7 +224,7 @@ void Processor::SetInputLocale(string const & locale)
 
   int8_t const code = StringUtf8Multilang::GetLangIndex(languages::Normalize(locale));
   LOG(LDEBUG, ("New input locale:", locale, "locale code:", code));
-  m_keywordsScorer.SetLanguages(LanguageTier::LANGUAGE_TIER_INPUT, {code});
+  m_keywordsScorer.SetLanguages(LanguageTier::LANGUAGE_TIER_INPUT, feature::GetSimilar(code));
   m_inputLocaleCode = CategoriesHolder::MapLocaleToInteger(locale);
 }
 
@@ -742,7 +747,10 @@ void Processor::InitPreRanker(Geocoder::Params const & geocoderParams,
   PreRanker::Params params;
 
   if (viewportSearch)
-    params.m_minDistanceOnMapBetweenResults = searchParams.m_minDistanceOnMapBetweenResults;
+  {
+    params.m_minDistanceOnMapBetweenResultsX = searchParams.m_minDistanceOnMapBetweenResultsX;
+    params.m_minDistanceOnMapBetweenResultsY = searchParams.m_minDistanceOnMapBetweenResultsY;
+  }
 
   params.m_viewport = GetViewport();
   params.m_accuratePivotCenter = GetPivotPoint(viewportSearch);

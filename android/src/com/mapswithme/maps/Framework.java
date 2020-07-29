@@ -151,7 +151,8 @@ public class Framework
   public interface PurchaseValidationListener
   {
     void onValidatePurchase(@PurchaseValidationCode int code, @NonNull String serverId,
-                            @NonNull String vendorId, @NonNull String encodedPurchaseData);
+                            @NonNull String vendorId, @NonNull String encodedPurchaseData,
+                            boolean isTrial);
   }
 
   @SuppressWarnings("unused")
@@ -530,7 +531,7 @@ public class Framework
 
   public static native boolean nativeHasActiveSubscription(@SubscriptionType int type);
   public static native void nativeSetActiveSubscription(@SubscriptionType int type,
-                                                        boolean isActive);
+                                                        boolean isActive, boolean isTrial);
 
   public static native int nativeGetCurrentTipIndex();
 

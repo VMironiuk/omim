@@ -168,7 +168,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
   private func configureViewControllers() -> [UIViewController] {
     var viewControllers = [UIViewController]()
     viewControllers.append(previewViewController)
-    if placePageData.isPromoCatalog && placePageData.bookmarkData == nil {
+    if placePageData.isPromoCatalog {
       viewControllers.append(catalogSingleItemViewController)
       viewControllers.append(catalogGalleryViewController)
       placePageData.loadCatalogPromo(completion: onLoadCatalogPromo)
@@ -223,7 +223,8 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
       if self.placePageData.bookmarkData == nil {
         self.actionBarViewController.resetButtons()
       }
-      self.updateBookmarkSection()
+      self.previewViewController.placePagePreviewData = self.placePageData.previewData
+      self.updateBookmarkRelatedSections()
     }
     placePageData.onUgcStatusUpdate = { [weak self] in
       self?.onLoadUgc()
@@ -241,11 +242,14 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     placePageData.onMapNodeStatusUpdate = { [weak self] in
       guard let self = self else { return }
       self.actionBarViewController.updateDownloadButtonState(self.placePageData.mapNodeAttributes!.nodeStatus)
-      if self.placePageData.mapNodeAttributes!.nodeStatus == .onDisk {
+      switch self.placePageData.mapNodeAttributes!.nodeStatus {
+      case .onDisk, .onDiskOutOfDate, .undefined:
         self.actionBarViewController.resetButtons()
         if self.placePageData.buttonsData != nil {
           self.buttonsViewController.buttonsEnabled = true
         }
+      default:
+        break
       }
     }
     placePageData.onMapNodeProgressUpdate = { [weak self] (downloadedBytes, totalBytes) in
@@ -347,6 +351,22 @@ extension PlacePageCommonLayout {
                                                                       kStatState: kStatOnline,
                                                                       kStatCount: catalogPromo.promoItems.count,
                                                                       kStatPlacement: statPlacement])
+    updateCatalogPromoVisibility()
+  }
+
+  func updateCatalogPromoVisibility() {
+    guard let catalogPromo = self.placePageData.catalogPromo, catalogPromo.promoItems.count > 0 else {
+      catalogSingleItemViewController.view.isHidden = true
+      catalogGalleryViewController.view.isHidden = true
+      return
+    }
+
+    let isBookmark = placePageData.bookmarkData != nil
+    if isBookmark {
+      catalogSingleItemViewController.view.isHidden = true
+      catalogGalleryViewController.view.isHidden = true
+      return
+    }
 
     if catalogPromo.promoItems.count == 1 {
       catalogSingleItemViewController.promoItem = catalogPromo.promoItems.first!
@@ -365,16 +385,21 @@ extension PlacePageCommonLayout {
     presenter?.updatePreviewOffset()
   }
 
-  func updateBookmarkSection() {
-    var hidden = false
+  func updateBookmarkRelatedSections() {
+    var isBookmark = false
     if let bookmarkData = placePageData.bookmarkData {
       bookmarkViewController.bookmarkData = bookmarkData
-    } else {
-      hidden = true
+      isBookmark = true
     }
     self.presenter?.layoutIfNeeded()
     UIView.animate(withDuration: kDefaultAnimationDuration) { [unowned self] in
-      self.bookmarkViewController.view.isHidden = hidden
+      self.bookmarkViewController.view.isHidden = !isBookmark
+      if (isBookmark) {
+        self.catalogGalleryViewController.view.isHidden = true
+        self.catalogSingleItemViewController.view.isHidden = true
+      } else {
+        self.updateCatalogPromoVisibility()
+      }
       self.presenter?.layoutIfNeeded()
     }
   }

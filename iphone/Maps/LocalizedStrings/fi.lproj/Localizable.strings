@@ -3282,9 +3282,11 @@
 
 "connection_error_toast_guides" = "Palauttamme Internet-yhteyden";
 
-"routes_card_show" = "Näytä";
+/* as few symbols as possible */
+"routes_card_show" = "Näytä kartalla";
 
-"routes_card_hide" = "Piilota";
+/* as few symbols as possible */
+"routes_card_hide" = "Piilota kartalta";
 
 "whatsnew_catalog_new_title" = "Uusi luettelo ja tuhansia lomasi viettoon liittyviä ideoita";
 
@@ -3313,6 +3315,45 @@
 "routes_card_routes_tag" = "Reitti";
 
 "routes_card_set_tag" = "Esitellyt paikat";
+
+/* FIXME */
+"guides_trial_cta_button" = "guides_trial_cta_button";
+
+/* FIXME */
+"guides_trial_message" = "guides_trial_message%s";
+
+/* FIXME */
+"trial_error_dialog" = "trial_error_dialog";
+
+/* FIXME */
+"floating_button_filters" = "Filters";
+
+/* FIXME */
+"date_picker_сhoose_dates_cta" = "Choose dates";
+
+/* FIXME */
+"guests_picker_rooms" = "Rooms";
+
+/* FIXME */
+"guests_picker_adults" = "Adults";
+
+/* FIXME */
+"guests_picker_children_title" = "Children";
+
+/* FIXME */
+"guests_picker_children_subtitle" = "3-16 y.o.";
+
+/* FIXME */
+"guests_picker_infants_title" = "Infants";
+
+/* FIXME */
+"guests_picker_infants_subtitle" = "0-3 y.o.";
+
+/* FIXME */
+"booking_map_component_availability" = "No rooms";
+
+/* FIXME */
+"booking_map_component_filters" = "Out of filters";
 
 
 /**********  Partners  **********/
@@ -3518,23 +3559,23 @@
 
 "type.amenity.recycling" = "Kierrätyskeskus";
 
-"type.amenity.recycling_container" = "Recycling container";
+"type.amenity.recycling_container" = "Kierrätysjäteastia";
 
-"type.recycling.toxic" = "Toxic waste";
+"type.recycling.toxic" = "Myrkkyjäte";
 
-"type.recycling.clothes" = "Old clothes";
+"type.recycling.clothes" = "Vanhat vaatteet";
 
-"type.recycling.glass_bottles" = "Glass bottles";
+"type.recycling.glass_bottles" = "Lasipullot";
 
-"type.recycling.paper" = "Paper waste";
+"type.recycling.paper" = "Paperi- ja kartonkijäte";
 
-"type.recycling.plastic" = "Plastic waste";
+"type.recycling.plastic" = "Muovijäte";
 
-"type.recycling.plastic_bottles" = "Plastic bottles";
+"type.recycling.plastic_bottles" = "Muovipullot";
 
-"type.recycling.scrap_metal" = "Scrap metal";
+"type.recycling.scrap_metal" = "Metalliromu";
 
-"type.recycling.small_appliances" = "Electronic waste";
+"type.recycling.small_appliances" = "Kodinkonejäte";
 
 "type.amenity.restaurant" = "Ravintola";
 
@@ -3908,7 +3949,7 @@
 
 "type.highway.footway.tunnel" = "Polku";
 
-"type.highway.ford" = "Ford";
+"type.highway.ford" = "Kahluupaikka";
 
 "type.highway.living_street" = "Katu";
 
@@ -4131,6 +4172,8 @@
 "type.hwtag" = "hwtag";
 
 "type.hwtag.bidir_bicycle" = "hwtag-bidir_bicycle";
+
+"type.hwtag.onedir_bicycle" = "hwtag-onedir_bicycle";
 
 "type.hwtag.lit" = "hwtag-lit";
 

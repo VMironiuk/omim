@@ -23,6 +23,7 @@ class BottomMenuLayersCell: UITableViewCell {
   }
   
   var onClose: (()->())?
+  var source: String = kStatMenu
   
   override func awakeFromNib() {
     super.awakeFromNib()
@@ -66,30 +67,30 @@ class BottomMenuLayersCell: UITableViewCell {
     let enable = !MapOverlayManager.guidesEnabled()
     MapOverlayManager.setGuidesEnabled(enable)
     Statistics.logEvent(kStatLayersClick, withParameters: [kStatName : kStatGuides,
-                                                           kStatFrom : kStatMenu,
+                                                           kStatFrom : source,
                                                            kStatTurnOn : enable])
   }
-  @IBAction func onTrafficButton(_ sender: UIButton) {
+  @IBAction func onTrafficButton(_ sender: Any) {
     let enable = !MapOverlayManager.trafficEnabled()
     MapOverlayManager.setTrafficEnabled(enable)
     Statistics.logEvent(kStatLayersClick, withParameters: [kStatName : kStatTraffic,
-                                                           kStatFrom : kStatMenu,
+                                                           kStatFrom : source,
                                                            kStatTurnOn : enable])
   }
   
-  @IBAction func onSubwayButton(_ sender: UIButton) {
+  @IBAction func onSubwayButton(_ sender: Any) {
     let enable = !MapOverlayManager.transitEnabled()
     MapOverlayManager.setTransitEnabled(enable)
     Statistics.logEvent(kStatLayersClick, withParameters: [kStatName : kStatSubway,
-                                                           kStatFrom : kStatMenu,
+                                                           kStatFrom : source,
                                                            kStatTurnOn : enable])
   }
   
-  @IBAction func onIsoLinesButton(_ sender: UIButton) {
+  @IBAction func onIsoLinesButton(_ sender: Any) {
     let enable = !MapOverlayManager.isoLinesEnabled()
     MapOverlayManager.setIsoLinesEnabled(enable)
     Statistics.logEvent(kStatLayersClick, withParameters: [kStatName : kStatIsolines,
-                                                           kStatFrom : kStatMenu,
+                                                           kStatFrom : source,
                                                            kStatTurnOn : enable])
   }
 }

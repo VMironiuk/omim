@@ -62,7 +62,7 @@ public class PurchaseOperationObservable implements Framework.PurchaseValidation
 
   @Override
   public void onValidatePurchase(int code, @NonNull String serverId, @NonNull String vendorId,
-                                 @NonNull String encodedPurchaseData)
+                                 @NonNull String encodedPurchaseData, boolean isTrial)
   {
     byte[] tokenBytes = Base64.decode(encodedPurchaseData, Base64.DEFAULT);
     String purchaseData = new String(tokenBytes);
@@ -71,12 +71,12 @@ public class PurchaseOperationObservable implements Framework.PurchaseValidation
     ValidationStatus status = ValidationStatus.values()[code];
     if (observer == null)
     {
-      PendingResult result = new PendingResult(status, serverId, vendorId, purchaseData);
+      PendingResult result = new PendingResult(status, serverId, vendorId, purchaseData, isTrial);
       mValidationPendingResults.put(orderId, result);
       return;
     }
 
-    observer.onValidatePurchase(status, serverId, vendorId, purchaseData);
+    observer.onValidatePurchase(status, serverId, vendorId, purchaseData, isTrial);
   }
 
   @Override
@@ -98,7 +98,7 @@ public class PurchaseOperationObservable implements Framework.PurchaseValidation
       mLogger.d(TAG, "Post pending validation result to '" + observer + "' for '"
                      + orderId + "'");
       observer.onValidatePurchase(result.getStatus(), result.getServerId(), result.getVendorId(),
-                                  result.getPurchaseData());
+                                  result.getPurchaseData(), result.isTrial());
     }
   }
 
@@ -130,14 +130,16 @@ public class PurchaseOperationObservable implements Framework.PurchaseValidation
     private final String mVendorId;
     @NonNull
     private final String mPurchaseData;
+    private final boolean mIsTrial;
 
     private PendingResult(@NonNull ValidationStatus status, @NonNull String serverId,
-                          @NonNull String vendorId, @NonNull String purchaseData)
+                          @NonNull String vendorId, @NonNull String purchaseData, boolean isTrial)
     {
       mStatus = status;
       mServerId = serverId;
       mVendorId = vendorId;
       mPurchaseData = purchaseData;
+      mIsTrial = isTrial;
     }
 
     @NonNull
@@ -162,6 +164,11 @@ public class PurchaseOperationObservable implements Framework.PurchaseValidation
     String getPurchaseData()
     {
       return mPurchaseData;
+    }
+
+    boolean isTrial()
+    {
+      return mIsTrial;
     }
   }
 }

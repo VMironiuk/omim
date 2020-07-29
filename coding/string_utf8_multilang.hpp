@@ -13,6 +13,7 @@
 #include <functional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace utils
 {
@@ -67,11 +68,11 @@ public:
   struct Lang
   {
     /// OSM language code (e.g. for name:en it's "en" part).
-    char const * m_code;
+    std::string m_code;
     /// Native language name.
-    char const * m_name;
-    /// Transliterator to latin id.
-    char const * m_transliteratorId;
+    std::string m_name;
+    /// Transliterators to latin ids.
+    std::vector<std::string> m_transliteratorsIds;
   };
 
   struct Position
@@ -86,9 +87,15 @@ public:
   static int8_t constexpr kDefaultCode = 0;
   static int8_t constexpr kEnglishCode = 1;
   static int8_t constexpr kInternationalCode = 7;
+  static int8_t constexpr kAltNameCode = 53;
+  static int8_t constexpr kOldNameCode = 55;
   /// How many languages we support on indexing stage. See full list in cpp file.
   /// TODO(AlexZ): Review and replace invalid languages by valid ones.
   static int8_t constexpr kMaxSupportedLanguages = 64;
+  // 6 bits language code mask. The language code is encoded with 6 bits that are prepended with
+  // "10".
+  static int8_t constexpr kLangCodeMask = 0x3F;
+  static_assert(kMaxSupportedLanguages == kLangCodeMask + 1, "");
   static char constexpr kReservedLang[] = "reserved";
 
   using Languages = buffer_vector<Lang, kMaxSupportedLanguages>;
@@ -101,8 +108,8 @@ public:
   static char const * GetLangByCode(int8_t langCode);
   /// @returns empty string if langCode is invalid.
   static char const * GetLangNameByCode(int8_t langCode);
-  /// @returns empty string if langCode is invalid.
-  static char const * GetTransliteratorIdByCode(int8_t langCode);
+  /// @returns empty vector if langCode is invalid.
+  static std::vector<std::string> const & GetTransliteratorsIdsByCode(int8_t langCode);
 
   inline bool operator==(StringUtf8Multilang const & rhs) const { return m_s == rhs.m_s; }
   inline bool operator!=(StringUtf8Multilang const & rhs) const { return !(*this == rhs); }
@@ -110,12 +117,23 @@ public:
   inline void Clear() { m_s.clear(); }
   inline bool IsEmpty() const { return m_s.empty(); }
 
+  // This method complexity is O(||utf8s||) when adding a new name and O(||m_s|| + ||utf8s||) when
+  // replacing an existing name.
   void AddString(int8_t lang, std::string const & utf8s);
   void AddString(std::string const & lang, std::string const & utf8s)
   {
     int8_t const l = GetLangIndex(lang);
-    if (l >= 0)
+    if (l != kUnsupportedLanguageCode)
       AddString(l, utf8s);
+  }
+
+  // This method complexity is O(||m_s||).
+  void RemoveString(int8_t lang);
+  void RemoveString(std::string const & lang)
+  {
+    int8_t const l = GetLangIndex(lang);
+    if (l != kUnsupportedLanguageCode)
+      RemoveString(l);
   }
 
   // Calls |fn| for each pair of |lang| and |utf8s| stored in this multilang string.
@@ -128,7 +146,7 @@ public:
     while (i < sz)
     {
       size_t const next = GetNextIndex(i);
-      int8_t const code = m_s[i] & 0x3F;
+      int8_t const code = m_s[i] & kLangCodeMask;
       if (GetLangByCode(code) != kReservedLang &&
           wrapper(code, m_s.substr(i + 1, next - i - 1)) == base::ControlFlow::Break)
       {

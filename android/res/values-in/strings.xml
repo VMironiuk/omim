@@ -1779,8 +1779,10 @@
 	<string name="connection_error_dialog_guides_try">Coba lagi</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Matikan</string>
 	<string name="connection_error_toast_guides">Mencoba menyambung kembali</string>
-	<string name="routes_card_show">Menampilkan</string>
-	<string name="routes_card_hide">Menyembunyikan</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Tampilkan di peta</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Sembunyikan dari peta</string>
 	<string name="whatsnew_catalog_new_title">Katalog panduan baru dan ribuan ide perjalanan</string>
 	<string name="whatsnew_catalog_new_message">Kami telah memperbarui katalog panduan dan menambahkan terjemahan dalam semua bahasa. Mulai perencanaan terlebih dahulu!</string>
 	<string name="whatsnew_elevation_profile_title">Profil elevasi dalam panduan perjalanan</string>
@@ -1869,6 +1871,15 @@
 	<string name="type.amenity.post_office">Kantor pos</string>
 	<string name="type.amenity.public_bookcase">Rak Buku</string>
 	<string name="type.amenity.recycling">TPA</string>
+	<string name="type.amenity.recycling_container">Wadah daur ulang</string>
+	<string name="type.recycling.toxic">Limbah beracun</string>
+	<string name="type.recycling.clothes">Pakaian lama</string>
+	<string name="type.recycling.glass_bottles">Botol kaca</string>
+	<string name="type.recycling.paper">Limbah kertas</string>
+	<string name="type.recycling.plastic">Limbah plastik</string>
+	<string name="type.recycling.plastic_bottles">Botol-botol plastik</string>
+	<string name="type.recycling.scrap_metal">Besi tua</string>
+	<string name="type.recycling.small_appliances">Limbah elektronik</string>
 	<string name="type.amenity.restaurant">Restoran</string>
 	<string name="type.amenity.school">Sekolah</string>
 	<string name="type.amenity.shelter">Tempat penampungan</string>
@@ -2012,6 +2023,7 @@
 	<string name="type.highway.footway.mountain_hiking">Jalur</string>
 	<string name="type.highway.footway.permissive">Jalur</string>
 	<string name="type.highway.footway.tunnel">Jalur</string>
+	<string name="type.highway.ford">Menyeberang</string>
 	<string name="type.highway.living_street">Jalan</string>
 	<string name="type.highway.living_street.bridge">Jalan</string>
 	<string name="type.highway.living_street.tunnel">Jalan</string>

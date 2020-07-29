@@ -3282,9 +3282,11 @@
 
 "connection_error_toast_guides" = "재연결 시도하기";
 
-"routes_card_show" = "보기";
+/* as few symbols as possible */
+"routes_card_show" = "지도에서 보이기";
 
-"routes_card_hide" = "숨기기";
+/* as few symbols as possible */
+"routes_card_hide" = "지도에서 숨기기";
 
 "whatsnew_catalog_new_title" = "새로운 가이드 카탈로그와 수 많은 여행 아이디어";
 
@@ -3313,6 +3315,45 @@
 "routes_card_routes_tag" = "일정표";
 
 "routes_card_set_tag" = "주요 장소";
+
+/* FIXME */
+"guides_trial_cta_button" = "guides_trial_cta_button";
+
+/* FIXME */
+"guides_trial_message" = "guides_trial_message%s";
+
+/* FIXME */
+"trial_error_dialog" = "trial_error_dialog";
+
+/* FIXME */
+"floating_button_filters" = "Filters";
+
+/* FIXME */
+"date_picker_сhoose_dates_cta" = "Choose dates";
+
+/* FIXME */
+"guests_picker_rooms" = "Rooms";
+
+/* FIXME */
+"guests_picker_adults" = "Adults";
+
+/* FIXME */
+"guests_picker_children_title" = "Children";
+
+/* FIXME */
+"guests_picker_children_subtitle" = "3-16 y.o.";
+
+/* FIXME */
+"guests_picker_infants_title" = "Infants";
+
+/* FIXME */
+"guests_picker_infants_subtitle" = "0-3 y.o.";
+
+/* FIXME */
+"booking_map_component_availability" = "No rooms";
+
+/* FIXME */
+"booking_map_component_filters" = "Out of filters";
 
 
 /**********  Partners  **********/
@@ -3518,23 +3559,23 @@
 
 "type.amenity.recycling" = "재활용센터";
 
-"type.amenity.recycling_container" = "Recycling container";
+"type.amenity.recycling_container" = "재활용 쓰레기통";
 
-"type.recycling.toxic" = "Toxic waste";
+"type.recycling.toxic" = "유독성 폐기물";
 
-"type.recycling.clothes" = "Old clothes";
+"type.recycling.clothes" = "낡은 옷";
 
-"type.recycling.glass_bottles" = "Glass bottles";
+"type.recycling.glass_bottles" = "유리병";
 
-"type.recycling.paper" = "Paper waste";
+"type.recycling.paper" = "종이 쓰레기";
 
-"type.recycling.plastic" = "Plastic waste";
+"type.recycling.plastic" = "플라스틱 쓰레기";
 
-"type.recycling.plastic_bottles" = "Plastic bottles";
+"type.recycling.plastic_bottles" = "플라스틱 병";
 
-"type.recycling.scrap_metal" = "Scrap metal";
+"type.recycling.scrap_metal" = "고철";
 
-"type.recycling.small_appliances" = "Electronic waste";
+"type.recycling.small_appliances" = "전자제품 쓰레기";
 
 "type.amenity.restaurant" = "레스토랑";
 
@@ -3908,7 +3949,7 @@
 
 "type.highway.footway.tunnel" = "경로";
 
-"type.highway.ford" = "Ford";
+"type.highway.ford" = "여울";
 
 "type.highway.living_street" = "거리";
 
@@ -4131,6 +4172,8 @@
 "type.hwtag" = "hwtag";
 
 "type.hwtag.bidir_bicycle" = "hwtag-bidir_bicycle";
+
+"type.hwtag.onedir_bicycle" = "hwtag-onedir_bicycle";
 
 "type.hwtag.lit" = "hwtag-lit";
 

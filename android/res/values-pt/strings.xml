@@ -1790,8 +1790,10 @@
 	<string name="connection_error_dialog_guides_try">Tentar novamente</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Desativar</string>
 	<string name="connection_error_toast_guides">Restaurando conexão com a Internet</string>
-	<string name="routes_card_show">Mostrar</string>
-	<string name="routes_card_hide">Ocultar</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Exibir no mapa</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Ocultar do mapa</string>
 	<string name="whatsnew_catalog_new_title">Catálogo novo e milhares de ideias para as férias</string>
 	<string name="whatsnew_catalog_new_message">Atualizamos o catálogo de guias e adicionamos traduções para todos os idiomas. Comece a planejar com antecedência!</string>
 	<string name="whatsnew_elevation_profile_title">Perfil de alturas nas guias</string>
@@ -1881,6 +1883,15 @@
 	<string name="type.amenity.post_office">Correios</string>
 	<string name="type.amenity.public_bookcase">Biblioteca livre</string>
 	<string name="type.amenity.recycling">Reciclagem</string>
+	<string name="type.amenity.recycling_container">Materiais recicláveis</string>
+	<string name="type.recycling.toxic">Resíduo tóxico</string>
+	<string name="type.recycling.clothes">Roupas velhas</string>
+	<string name="type.recycling.glass_bottles">Vidro</string>
+	<string name="type.recycling.paper">Papel</string>
+	<string name="type.recycling.plastic">Plástico</string>
+	<string name="type.recycling.plastic_bottles">Garrafas plásticas</string>
+	<string name="type.recycling.scrap_metal">Sucata</string>
+	<string name="type.recycling.small_appliances">Resíduo eletrônico</string>
 	<string name="type.amenity.restaurant">Restaurante</string>
 	<string name="type.amenity.school">Escola</string>
 	<string name="type.amenity.shelter">Abrigo</string>
@@ -2026,6 +2037,7 @@
 	<string name="type.highway.footway.mountain_hiking">Caminho</string>
 	<string name="type.highway.footway.permissive">Caminho</string>
 	<string name="type.highway.footway.tunnel">Caminho</string>
+	<string name="type.highway.ford">Passo</string>
 	<string name="type.highway.living_street">Rua</string>
 	<string name="type.highway.living_street.bridge">Rua</string>
 	<string name="type.highway.living_street.tunnel">Rua</string>

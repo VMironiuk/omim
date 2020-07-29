@@ -5,17 +5,20 @@
 
 #include "map/booking_availability_filter.hpp"
 #include "map/booking_filter_processor.hpp"
+#include "map/booking_utils.hpp"
+
+#include "search/result.hpp"
 
 #include "partners_api/booking_api.hpp"
 
-#include "search/result.hpp"
+#include "storage/country_info_getter.hpp"
 
 #include "indexer/data_source.hpp"
 #include "indexer/feature_meta.hpp"
 
-#include "storage/country_info_getter.hpp"
-
 #include "platform/platform.hpp"
+
+#include "base/string_utils.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -114,9 +117,11 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_AvailabilitySmoke)
       rect, scales::GetUpperScale());
   ParamsInternal filterParams;
   search::Results filteredResults;
+  std::vector<booking::Extras> availabilityExtras;
   filterParams.m_apiParams = std::make_shared<booking::AvailabilityParams>();
-  filterParams.m_callback = [&filteredResults](search::Results const & results) {
-    filteredResults = results;
+  filterParams.m_callback = [&filteredResults, &availabilityExtras](auto && result) {
+    filteredResults = result.m_passedFilter;
+    availabilityExtras = result.m_extras;
     testing::Notify();
   };
 
@@ -126,6 +131,8 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_AvailabilitySmoke)
 
   TEST_NOT_EQUAL(filteredResults.GetCount(), 0, ());
   TEST_EQUAL(filteredResults.GetCount(), expectedResults.GetCount(), ());
+  TEST(!availabilityExtras.empty(), ());
+  TEST_EQUAL(availabilityExtras.size(), filteredResults.GetCount(), ());
 
   for (size_t i = 0; i < filteredResults.GetCount(); ++i)
   {
@@ -200,20 +207,24 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_ProcessorSmoke)
   TasksInternal tasks;
   ParamsInternal availabilityParams;
   search::Results availabilityResults;
+  std::vector<booking::Extras> availabilityExtras;
   availabilityParams.m_apiParams = std::make_shared<booking::AvailabilityParams>();
-  availabilityParams.m_callback = [&availabilityResults](search::Results const & results) {
-    availabilityResults = results;
+  availabilityParams.m_callback = [&availabilityResults, &availabilityExtras](auto && result) {
+    availabilityResults = result.m_passedFilter;
+    availabilityExtras = result.m_extras;
   };
 
   tasks.emplace_back(Type::Availability, std::move(availabilityParams));
 
   ParamsInternal dealsParams;
   search::Results dealsResults;
+  std::vector<booking::Extras> dealsExtras;
   booking::AvailabilityParams p;
   p.m_dealsOnly = true;
   dealsParams.m_apiParams = std::make_shared<booking::AvailabilityParams>(p);
-  dealsParams.m_callback = [&dealsResults](search::Results const & results) {
-    dealsResults = results;
+  dealsParams.m_callback = [&dealsResults, &dealsExtras](auto && result) {
+    dealsResults = result.m_passedFilter;
+    dealsExtras = result.m_extras;
     testing::Notify();
   };
 
@@ -227,6 +238,8 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_ProcessorSmoke)
 
   TEST_NOT_EQUAL(availabilityResults.GetCount(), 0, ());
   TEST_EQUAL(availabilityResults.GetCount(), expectedAvailabilityResults.GetCount(), ());
+  TEST(!availabilityExtras.empty(), ());
+  TEST_EQUAL(availabilityExtras.size(), availabilityResults.GetCount(), ());
 
   for (size_t i = 0; i < availabilityResults.GetCount(); ++i)
   {
@@ -236,6 +249,8 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_ProcessorSmoke)
 
   TEST_NOT_EQUAL(dealsResults.GetCount(), 0, ());
   TEST_EQUAL(dealsResults.GetCount(), expectedDealsResults.GetCount(), ());
+  TEST(!dealsExtras.empty(), ());
+  TEST_EQUAL(dealsExtras.size(), dealsResults.GetCount(), ());
 
   for (size_t i = 0; i < dealsResults.GetCount(); ++i)
   {
@@ -319,9 +334,11 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_ApplyFilterOntoWithFeatureIds)
 
   ParamsRawInternal filterParams;
   std::vector<FeatureID> filteredResults;
+  std::vector<booking::Extras> availabilityExtras;
   filterParams.m_apiParams = std::make_shared<booking::AvailabilityParams>();
-  filterParams.m_callback = [&filteredResults](std::vector<FeatureID> const & results) {
-    filteredResults = results;
+  filterParams.m_callback = [&filteredResults, &availabilityExtras](auto && result) {
+    filteredResults = result.m_passedFilter;
+    availabilityExtras = result.m_extras;
     testing::Notify();
   };
 
@@ -332,5 +349,57 @@ UNIT_CLASS_TEST(TestMwmEnvironment, BookingFilter_ApplyFilterOntoWithFeatureIds)
   TEST_NOT_EQUAL(filteredResults.size(), 0, ());
   TEST_EQUAL(filteredResults.size(), expectedFeatureIds.size(), ());
   TEST_EQUAL(filteredResults, expectedFeatureIds, ());
+  TEST(!availabilityExtras.empty(), ());
+  TEST_EQUAL(availabilityExtras.size(), filteredResults.size(), ());
+}
+
+UNIT_TEST(Booking_PriceFormatter)
+{
+  booking::PriceFormatter formatter;
+
+  {
+    auto const result = formatter.Format(1, "USD");
+    TEST(strings::StartsWith(result, "1 "), ());
+  }
+  {
+    auto const result = formatter.Format(12, "USD");
+    TEST(strings::StartsWith(result, "12 "), ());
+  }
+  {
+    auto const result = formatter.Format(123, "USD");
+    TEST(strings::StartsWith(result, "123 "), ());
+  }
+  {
+    auto const result = formatter.Format(1234, "USD");
+    TEST(strings::StartsWith(result, "1,234 "), (result));
+  }
+  {
+    auto const result = formatter.Format(12345, "USD");
+    TEST(strings::StartsWith(result, "12,345 "), (result));
+  }
+  {
+    auto const result = formatter.Format(123456, "USD");
+    TEST(strings::StartsWith(result, "123,456 "), (result));
+  }
+  {
+    auto const result = formatter.Format(1234567, "USD");
+    TEST(strings::StartsWith(result, "1,234,567 "), (result));
+  }
+  {
+    auto const result = formatter.Format(12345678, "USD");
+    TEST(strings::StartsWith(result, "12,345,678 "), (result));
+  }
+  {
+    auto const result = formatter.Format(123456789, "USD");
+    TEST(strings::StartsWith(result, std::string("123,456,") + u8"\u2026" + " "), (result));
+  }
+  {
+    auto const result = formatter.Format(1234567891, "USD");
+    TEST(strings::StartsWith(result, std::string("1,234,56") + u8"\u2026" + " "), (result));
+  }
+  {
+    auto const result = formatter.Format(12345678911, "USD");
+    TEST(strings::StartsWith(result, std::string("12,345,6") + u8"\u2026" + " "), (result));
+  }
 }
 }  // namespace

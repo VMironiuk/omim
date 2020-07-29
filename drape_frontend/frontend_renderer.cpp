@@ -345,7 +345,7 @@ void FrontendRenderer::AcceptMessage(ref_ptr<Message> message)
           }
         }
       }
-      if (changed)
+      if (changed || m_notFinishedTiles.empty())
         UpdateCanBeDeletedStatus();
 
       if (m_notFinishedTiles.empty())
@@ -829,10 +829,16 @@ void FrontendRenderer::AcceptMessage(ref_ptr<Message> message)
       break;
     }
 
-  case Message::Type::SetTimeInBackground:
+  case Message::Type::OnEnterForeground:
     {
-      ref_ptr<SetTimeInBackgroundMessage> msg = message;
-      m_myPositionController->SetTimeInBackground(msg->GetTime());
+      ref_ptr<OnEnterForegroundMessage> msg = message;
+      m_myPositionController->OnEnterForeground(msg->GetTime());
+      break;
+    }
+
+  case Message::Type::OnEnterBackground:
+    {
+      m_myPositionController->OnEnterBackground();
       break;
     }
 
@@ -1351,7 +1357,11 @@ void FrontendRenderer::ProcessSelection(ref_ptr<SelectObjectMessage> msg)
     {
       m2::PointD startPosition;
       m_selectionShape->IsVisible(modelView, startPosition);
-      m_selectionTrackInfo = SelectionTrackInfo(modelView.GlobalRect(), startPosition);
+      
+      if (msg->GetSelectedObject() == SelectionShape::ESelectedObject::OBJECT_GUIDE)
+        m_selectionTrackInfo.reset();
+      else
+        m_selectionTrackInfo = SelectionTrackInfo(modelView.GlobalRect(), startPosition);
     }
 
     if (msg->IsGeometrySelectionAllowed())
@@ -1490,8 +1500,8 @@ void FrontendRenderer::RenderScene(ScreenBase const & modelView, bool activeFram
       RenderUserMarksLayer(modelView, DepthLayer::RoutingBottomMarkLayer);
       RenderUserMarksLayer(modelView, DepthLayer::RoutingMarkLayer);
       RenderUserMarksLayer(modelView, DepthLayer::GuidesBottomMarkLayer);
-      RenderUserMarksLayer(modelView, DepthLayer::GuidesMarkLayer);
-      RenderSearchMarksLayer(modelView);
+      RenderNonDisplacedUserMarksLayer(modelView, DepthLayer::GuidesMarkLayer);
+      RenderNonDisplacedUserMarksLayer(modelView, DepthLayer::SearchMarkLayer);
     }
 
     if (!HasRouteData())
@@ -1686,16 +1696,17 @@ void FrontendRenderer::RenderUserMarksLayer(ScreenBase const & modelView, DepthL
     RenderSingleGroup(m_context, modelView, make_ref(group));
 }
 
-void FrontendRenderer::RenderSearchMarksLayer(ScreenBase const & modelView)
+void FrontendRenderer::RenderNonDisplacedUserMarksLayer(ScreenBase const & modelView,
+                                                        DepthLayer layerId)
 {
-  auto & layer = m_layers[static_cast<size_t>(DepthLayer::SearchMarkLayer)];
+  auto & layer = m_layers[static_cast<size_t>(layerId)];
   layer.Sort(nullptr);
   for (drape_ptr<RenderGroup> & group : layer.m_renderGroups)
   {
     group->SetOverlayVisibility(true);
     group->Update(modelView);
   }
-  RenderUserMarksLayer(modelView, DepthLayer::SearchMarkLayer);
+  RenderUserMarksLayer(modelView, layerId);
 }
 
 void FrontendRenderer::RenderEmptyFrame()
@@ -1859,9 +1870,7 @@ void FrontendRenderer::BuildOverlayTree(ScreenBase const & modelView)
                                            DepthLayer::LocalAdsMarkLayer,
                                            DepthLayer::NavigationLayer,
                                            DepthLayer::RoutingBottomMarkLayer,
-                                           DepthLayer::RoutingMarkLayer,
-                                           DepthLayer::GuidesBottomMarkLayer,
-                                           DepthLayer::GuidesMarkLayer};
+                                           DepthLayer::RoutingMarkLayer};
   BeginUpdateOverlayTree(modelView);
   for (auto const & layerId : layers)
   {
@@ -2665,7 +2674,7 @@ void FrontendRenderer::RenderLayer::Sort(ref_ptr<dp::OverlayTree> overlayTree)
 }
 
 // static
-m2::AnyRectD TapInfo::GetDefaultSearchRect(m2::PointD const & mercator, ScreenBase const & screen)
+m2::AnyRectD TapInfo::GetDefaultTapRect(m2::PointD const & mercator, ScreenBase const & screen)
 {
   m2::AnyRectD result;
   double const halfSize = VisualParams::Instance().GetTouchRectRadius();
@@ -2674,7 +2683,7 @@ m2::AnyRectD TapInfo::GetDefaultSearchRect(m2::PointD const & mercator, ScreenBa
 }
 
 // static
-m2::AnyRectD TapInfo::GetBookmarkSearchRect(m2::PointD const & mercator, ScreenBase const & screen)
+m2::AnyRectD TapInfo::GetBookmarkTapRect(m2::PointD const & mercator, ScreenBase const & screen)
 {
   static int constexpr kBmTouchPixelIncrease = 20;
 
@@ -2689,7 +2698,7 @@ m2::AnyRectD TapInfo::GetBookmarkSearchRect(m2::PointD const & mercator, ScreenB
 }
 
 // static
-m2::AnyRectD TapInfo::GetRoutingPointSearchRect(m2::PointD const & mercator, ScreenBase const & screen)
+m2::AnyRectD TapInfo::GetRoutingPointTapRect(m2::PointD const & mercator, ScreenBase const & screen)
 {
   static int constexpr kRoutingPointTouchPixelIncrease = 20;
 
@@ -2701,7 +2710,19 @@ m2::AnyRectD TapInfo::GetRoutingPointSearchRect(m2::PointD const & mercator, Scr
 }
 
 // static
-m2::AnyRectD TapInfo::GetPreciseSearchRect(m2::PointD const & mercator, double const eps)
+m2::AnyRectD TapInfo::GetGuideTapRect(m2::PointD const & mercator, ScreenBase const & screen)
+{
+  static int constexpr kGuideTouchPixelIncrease = 20;
+
+  m2::AnyRectD result;
+  double const sizeExt = kGuideTouchPixelIncrease * VisualParams::Instance().GetVisualScale();
+  double const halfSize = VisualParams::Instance().GetTouchRectRadius();
+  screen.GetTouchRect(screen.GtoP(mercator), halfSize + sizeExt, result);
+  return result;
+}
+
+// static
+m2::AnyRectD TapInfo::GetPreciseTapRect(m2::PointD const & mercator, double const eps)
 {
   return m2::AnyRectD(mercator, ang::AngleD(0.0) /* angle */, m2::RectD(-eps, -eps, eps, eps));
 }

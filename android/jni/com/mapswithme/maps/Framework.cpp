@@ -196,18 +196,16 @@ bool Framework::CreateDrapeEngine(JNIEnv * env, jobject jSurface, int densityDpi
   // Vulkan is supported only since Android 8.0, because some Android devices with Android 7.x
   // have fatal driver issue, which can lead to process termination and whole OS destabilization.
   int constexpr kMinSdkVersionForVulkan = 26;
-  // Ban Vulkan temporarily for Android 10.0 because of unfixed rendering artifacts.
-  int constexpr kMaxSdkVersionForVulkan = 28;
   int const sdkVersion = GetAndroidSdkVersion();
   auto const vulkanForbidden = sdkVersion < kMinSdkVersionForVulkan ||
-                               sdkVersion > kMaxSdkVersionForVulkan ||
                                dp::SupportManager::Instance().IsVulkanForbidden();
   if (vulkanForbidden)
     LOG(LWARNING, ("Vulkan API is forbidden on this device."));
 
   if (m_work.LoadPreferredGraphicsAPI() == dp::ApiVersion::Vulkan && !vulkanForbidden)
   {
-    m_vulkanContextFactory = make_unique_dp<AndroidVulkanContextFactory>(appVersionCode);
+    m_vulkanContextFactory =
+        make_unique_dp<AndroidVulkanContextFactory>(appVersionCode, sdkVersion);
     if (!CastFactory(m_vulkanContextFactory)->IsVulkanSupported())
     {
       LOG(LWARNING, ("Vulkan API is not supported."));
@@ -943,18 +941,18 @@ void CallSetRoutingLoadPointsListener(shared_ptr<jobject> listener, bool success
 RoutingManager::LoadRouteHandler g_loadRouteHandler;
 
 void CallPurchaseValidationListener(shared_ptr<jobject> listener, Purchase::ValidationCode code,
-                                    Purchase::ValidationInfo const & validationInfo)
+                                    Purchase::ValidationResponse const & validationResponse)
 {
   JNIEnv * env = jni::GetEnv();
   jmethodID const methodId = jni::GetMethodID(env, *listener, "onValidatePurchase",
-    "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V");
 
-  jni::TScopedLocalRef const serverId(env, jni::ToJavaString(env, validationInfo.m_serverId));
-  jni::TScopedLocalRef const vendorId(env, jni::ToJavaString(env, validationInfo.m_vendorId));
-  jni::TScopedLocalRef const receiptData(env, jni::ToJavaString(env, validationInfo.m_receiptData));
+  jni::TScopedLocalRef const serverId(env, jni::ToJavaString(env, validationResponse.m_info.m_serverId));
+  jni::TScopedLocalRef const vendorId(env, jni::ToJavaString(env, validationResponse.m_info.m_vendorId));
+  jni::TScopedLocalRef const receiptData(env, jni::ToJavaString(env, validationResponse.m_info.m_receiptData));
 
   env->CallVoidMethod(*listener, methodId, static_cast<jint>(code), serverId.get(), vendorId.get(),
-                      receiptData.get());
+                      receiptData.get(), static_cast<jboolean>(validationResponse.m_isTrial));
 }
 
 void CallStartPurchaseTransactionListener(shared_ptr<jobject> listener, bool success,
@@ -1800,8 +1798,8 @@ Java_com_mapswithme_maps_Framework_nativeIsIsolinesLayerEnabled(JNIEnv * env, jc
 JNIEXPORT void JNICALL Java_com_mapswithme_maps_Framework_nativeSetGuidesLayerEnabled(
     JNIEnv * env, jclass, jboolean enabled)
 {
-  frm()->GetGuidesManager().SetEnabled(static_cast<bool>(enabled));
   frm()->SaveGuidesEnabled(static_cast<bool>(enabled));
+  frm()->GetGuidesManager().SetEnabled(static_cast<bool>(enabled));
 }
 
 JNIEXPORT jboolean JNICALL
@@ -2066,13 +2064,10 @@ Java_com_mapswithme_maps_Framework_nativeGetDownloaderPromoBanner(JNIEnv * env, 
   static jmethodID const downloaderPromoBannerConstructor = jni::GetConstructorID(env,
       downloaderPromoBannerClass, "(ILjava/lang/String;)V");
 
-  std::vector<ads::Banner> banners;
   auto const pos = frm()->GetCurrentPosition();
-  if (pos)
-  {
-    banners = frm()->GetAdsEngine().GetDownloadOnMapBanners(jni::ToNativeString(env, mwmId), *pos,
-                                                            languages::GetCurrentNorm());
-  }
+  auto const banners =
+      frm()->GetAdsEngine().GetDownloadOnMapBanners(jni::ToNativeString(env, mwmId), pos,
+                                                    languages::GetCurrentNorm());
 
   if (banners.empty())
     return nullptr;
@@ -2190,13 +2185,14 @@ Java_com_mapswithme_maps_Framework_nativeHasActiveSubscription(JNIEnv *, jclass,
 
 JNIEXPORT void JNICALL
 Java_com_mapswithme_maps_Framework_nativeSetActiveSubscription(JNIEnv *, jclass, jint type,
-                                                               jboolean isActive)
+                                                               jboolean isActive, jboolean isTrial)
 {
   auto const & purchase = frm()->GetPurchase();
   if (purchase == nullptr)
     return;
-  purchase->SetSubscriptionEnabled(static_cast<SubscriptionType>(type),
-                                   static_cast<bool>(isActive));
+
+  purchase->SetSubscriptionEnabled(static_cast<SubscriptionType>(type), static_cast<bool>(isActive),
+                                   static_cast<bool>(isTrial));
 }
 
 JNIEXPORT jint JNICALL

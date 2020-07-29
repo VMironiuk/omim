@@ -47,18 +47,31 @@ Transliteration & Transliteration::Instance()
 
 void Transliteration::Init(std::string const & icuDataDir)
 {
-  // This function should be called at most once in a process,
-  // before the first ICU operation that will require the loading of an ICU data file.
-  // This function is not thread-safe. Use it before calling ICU APIs from multiple threads.
+  // Fast atomic check before mutex lock.
+  if (m_inited)
+    return;
+
+  std::lock_guard<std::mutex> lock(m_initializationMutex);
+  if (m_inited)
+    return;
+
+  // This function should be called before the first ICU operation that will require the loading of
+  // an ICU data file.
   u_setDataDirectory(icuDataDir.c_str());
 
   for (auto const & lang : StringUtf8Multilang::GetSupportedLanguages())
   {
-    if (strlen(lang.m_transliteratorId) == 0 || m_transliterators.count(lang.m_transliteratorId) != 0)
-      continue;
-
-    m_transliterators.emplace(lang.m_transliteratorId, std::make_unique<TransliteratorInfo>());
+    for (auto const & t : lang.m_transliteratorsIds)
+    {
+      if (m_transliterators.count(t) == 0)
+        m_transliterators.emplace(t, std::make_unique<TransliteratorInfo>());
+    }
   }
+
+  // We need "Hiragana-Katakana" for strings normalization, not for latin transliteration.
+  // That's why it is not mentioned in StringUtf8Multilang transliterators list.
+  m_transliterators.emplace("Hiragana-Katakana", std::make_unique<TransliteratorInfo>());
+  m_inited = true;
 }
 
 void Transliteration::SetMode(Transliteration::Mode mode)
@@ -66,18 +79,10 @@ void Transliteration::SetMode(Transliteration::Mode mode)
   m_mode = mode;
 }
 
-bool Transliteration::Transliterate(std::string const & str, int8_t langCode, std::string & out) const
+bool Transliteration::Transliterate(std::string transliteratorId, UnicodeString & ustr) const
 {
-  if (m_mode != Mode::Enabled)
-    return false;
-
-  if (str.empty() || strings::IsASCIIString(str))
-    return false;
-
-  std::string transliteratorId(StringUtf8Multilang::GetTransliteratorIdByCode(langCode));
-
-  if (transliteratorId.empty())
-    return false;
+  CHECK(m_inited, ());
+  CHECK(!transliteratorId.empty(), (transliteratorId));
 
   auto it = m_transliterators.find(transliteratorId);
   if (it == m_transliterators.end())
@@ -93,15 +98,20 @@ bool Transliteration::Transliterate(std::string const & str, int8_t langCode, st
     {
       UErrorCode status = U_ZERO_ERROR;
 
-      std::string const removeDiacriticRule = ";NFD;[\u02B9-\u02D3\u0301-\u0358\u00B7\u0027]Remove;NFC";
+      std::string const removeDiacriticRule =
+          ";NFD;[\u02B9-\u02D3\u0301-\u0358\u00B7\u0027]Remove;NFC";
       transliteratorId.append(removeDiacriticRule);
 
       UnicodeString translitId(transliteratorId.c_str());
 
-      it->second->m_transliterator.reset(Transliterator::createInstance(translitId, UTRANS_FORWARD, status));
+      it->second->m_transliterator.reset(
+          Transliterator::createInstance(translitId, UTRANS_FORWARD, status));
 
       if (it->second->m_transliterator == nullptr)
-        LOG(LWARNING, ("Cannot create transliterator \"", transliteratorId, "\", icu error =", status));
+      {
+        LOG(LWARNING,
+            ("Cannot create transliterator \"", transliteratorId, "\", icu error =", status));
+      }
 
       it->second->m_initialized = true;
     }
@@ -110,8 +120,42 @@ bool Transliteration::Transliterate(std::string const & str, int8_t langCode, st
   if (it->second->m_transliterator == nullptr)
     return false;
 
-  UnicodeString ustr(str.c_str());
   it->second->m_transliterator->transliterate(ustr);
+
+  if (ustr.isEmpty())
+    return false;
+
+  return true;
+}
+
+bool Transliteration::TransliterateForce(std::string const & str, std::string const & transliteratorId,
+                                         std::string & out) const
+{
+  CHECK(m_inited, ());
+  UnicodeString ustr(str.c_str());
+  auto const res = Transliterate(transliteratorId, ustr);
+  if (res)
+    ustr.toUTF8String(out);
+  return res;
+}
+
+bool Transliteration::Transliterate(std::string const & str, int8_t langCode,
+                                    std::string & out) const
+{
+  CHECK(m_inited, ());
+  if (m_mode != Mode::Enabled)
+    return false;
+
+  if (str.empty() || strings::IsASCIIString(str))
+    return false;
+
+  auto const & transliteratorsIds = StringUtf8Multilang::GetTransliteratorsIdsByCode(langCode);
+  if (transliteratorsIds.empty())
+    return false;
+
+  UnicodeString ustr(str.c_str());
+  for (auto transliteratorId : transliteratorsIds)
+    Transliterate(transliteratorId, ustr);
 
   if (ustr.isEmpty())
     return false;

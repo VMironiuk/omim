@@ -1,38 +1,41 @@
+#import <CoreApi/MWMCommon.h>
 #import "MWMSearchManager+Layout.h"
 #import "MapViewController.h"
-#import <CoreApi/MWMCommon.h>
 
 static CGFloat const kWidthForiPad = 320.0;
+static CGFloat const changeModeViewOffsetNormal = -24;
+static CGFloat const changeModeViewOffsetKeyboard = -12;
 
 @interface MWMSearchManager ()
 
-@property(nonatomic) IBOutlet UIView * searchBarView;
-@property(nonatomic) IBOutlet UIView * actionBarView;
-@property(nonatomic) IBOutlet UIView * contentView;
+@property(nonatomic) IBOutlet UIView *searchBarView;
+@property(nonatomic) IBOutlet UIView *actionBarView;
+@property(nonatomic) IBOutlet UIView *contentView;
 
-@property(nonatomic) NSLayoutConstraint * actionBarViewBottom;
+@property(nonatomic) NSLayoutConstraint *contentViewTopHidden;
+@property(nonatomic) NSLayoutConstraint *actionBarViewBottomKeyboard;
+@property(nonatomic) NSLayoutConstraint *actionBarViewBottomNormal;
 
-@property(weak, nonatomic, readonly) UIView * searchViewContainer;
+@property(weak, nonatomic, readonly) UIView *searchViewContainer;
 
 @end
 
 @implementation MWMSearchManager (Layout)
 
-- (void)layoutTopViews
-{
-  UIView * searchBarView = self.searchBarView;
-  UIView * actionBarView = self.actionBarView;
-  UIView * contentView = self.contentView;
-  UIView * parentView = self.searchViewContainer;
+- (void)layoutTopViews {
+  UIView *searchBarView = self.searchBarView;
+  UIView *changeModeView = self.actionBarView;
+  UIView *contentView = self.contentView;
+  UIView *parentView = self.searchViewContainer;
 
   searchBarView.translatesAutoresizingMaskIntoConstraints = NO;
-  actionBarView.translatesAutoresizingMaskIntoConstraints = NO;
+  changeModeView.translatesAutoresizingMaskIntoConstraints = NO;
   contentView.translatesAutoresizingMaskIntoConstraints = NO;
 
-  NSLayoutXAxisAnchor * leadingAnchor = parentView.leadingAnchor;
-  NSLayoutXAxisAnchor * trailingAnchor = parentView.trailingAnchor;
-  NSLayoutYAxisAnchor * topAnchor = parentView.safeAreaLayoutGuide.topAnchor;
-  NSLayoutYAxisAnchor * bottomAnchor = parentView.safeAreaLayoutGuide.bottomAnchor;
+  NSLayoutXAxisAnchor *leadingAnchor = parentView.leadingAnchor;
+  NSLayoutXAxisAnchor *trailingAnchor = parentView.trailingAnchor;
+  NSLayoutYAxisAnchor *topAnchor = parentView.safeAreaLayoutGuide.topAnchor;
+  NSLayoutYAxisAnchor *bottomAnchor = parentView.safeAreaLayoutGuide.bottomAnchor;
 
   [searchBarView.topAnchor constraintEqualToAnchor:topAnchor].active = YES;
   [searchBarView.leadingAnchor constraintEqualToAnchor:leadingAnchor].active = YES;
@@ -41,29 +44,69 @@ static CGFloat const kWidthForiPad = 320.0;
   else
     [searchBarView.trailingAnchor constraintEqualToAnchor:trailingAnchor].active = YES;
 
-  NSLayoutConstraint * actionBarViewTop =
-      [actionBarView.topAnchor constraintEqualToAnchor:searchBarView.bottomAnchor];
-  actionBarViewTop.priority = UILayoutPriorityDefaultLow + 10;
-  actionBarViewTop.active = YES;
+  [changeModeView.centerXAnchor constraintEqualToAnchor:parentView.centerXAnchor].active = YES;
+  self.actionBarViewBottomNormal = [changeModeView.bottomAnchor constraintEqualToAnchor:bottomAnchor
+                                                                               constant:changeModeViewOffsetNormal];
+  self.actionBarViewBottomNormal.priority = UILayoutPriorityDefaultLow + 10;
+  self.actionBarViewBottomNormal.active = YES;
 
-  [actionBarView.leadingAnchor constraintEqualToAnchor:searchBarView.leadingAnchor].active = YES;
-  [actionBarView.trailingAnchor constraintEqualToAnchor:searchBarView.trailingAnchor].active = YES;
-  self.actionBarViewBottom = [actionBarView.bottomAnchor constraintEqualToAnchor:bottomAnchor];
-  self.actionBarViewBottom.priority = UILayoutPriorityDefaultLow;
-  self.actionBarViewBottom.active = YES;
+  self.actionBarViewBottomKeyboard = [changeModeView.bottomAnchor constraintEqualToAnchor:parentView.bottomAnchor
+                                                                                 constant:changeModeViewOffsetKeyboard];
+  self.actionBarViewBottomKeyboard.priority = UILayoutPriorityDefaultLow;
+  self.actionBarViewBottomKeyboard.active = YES;
 
-  NSLayoutConstraint * contentViewTop =
-      [contentView.topAnchor constraintEqualToAnchor:actionBarView.bottomAnchor];
-  contentViewTop.priority = UILayoutPriorityDefaultLow;
+  NSLayoutConstraint *contentViewTop = [contentView.topAnchor constraintEqualToAnchor:searchBarView.bottomAnchor];
+  contentViewTop.priority = UILayoutPriorityDefaultLow + 10;
   contentViewTop.active = YES;
 
-  NSLayoutConstraint * contentViewBottom =
-      [contentView.bottomAnchor constraintEqualToAnchor:bottomAnchor];
+  NSLayoutConstraint *contentViewBottom = [contentView.bottomAnchor constraintEqualToAnchor:parentView.bottomAnchor];
   contentViewBottom.priority = UILayoutPriorityDefaultLow + 10;
   contentViewBottom.active = YES;
 
+  self.contentViewTopHidden = [contentView.topAnchor constraintEqualToAnchor:parentView.bottomAnchor];
+  self.contentViewTopHidden.priority = UILayoutPriorityDefaultLow;
+  self.contentViewTopHidden.active = YES;
+
   [contentView.leadingAnchor constraintEqualToAnchor:searchBarView.leadingAnchor].active = YES;
   [contentView.trailingAnchor constraintEqualToAnchor:searchBarView.trailingAnchor].active = YES;
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(keyboardWillShow:)
+                                               name:UIKeyboardWillShowNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(keyboardWillHide:)
+                                               name:UIKeyboardWillHideNotification
+                                             object:nil];
+}
+
+#pragma mark - keyboard movements
+- (void)keyboardWillShow:(NSNotification *)notification {
+  CGSize keyboardSize = [[[notification userInfo] objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue].size;
+  CGFloat offset = IPAD ? changeModeViewOffsetNormal : changeModeViewOffsetKeyboard;
+  if (self.actionBarView.isHidden) {
+    self.actionBarViewBottomKeyboard.constant = -keyboardSize.height + offset;
+    self.actionBarViewBottomKeyboard.priority = UILayoutPriorityDefaultHigh;
+  } else {
+    [UIView animateWithDuration:kDefaultAnimationDuration
+                     animations:^{
+                       self.actionBarViewBottomKeyboard.constant = -keyboardSize.height + offset;
+                       self.actionBarViewBottomKeyboard.priority = UILayoutPriorityDefaultHigh;
+                       [self.actionBarView.superview layoutIfNeeded];
+                     }];
+  }
+}
+
+- (void)keyboardWillHide:(NSNotification *)notification {
+  if (self.actionBarView.isHidden) {
+    self.actionBarViewBottomKeyboard.priority = UILayoutPriorityDefaultLow;
+  } else {
+    [UIView animateWithDuration:kDefaultAnimationDuration
+                     animations:^{
+                       self.actionBarViewBottomKeyboard.priority = UILayoutPriorityDefaultLow;
+                       [self.actionBarView.superview layoutIfNeeded];
+                     }];
+  }
 }
 
 @end

@@ -388,7 +388,10 @@ void SearchAPI::FilterAllHotelsInViewport(m2::RectD const & viewport,
   });
 
   if (featureIds.size() <= kMaxHotelFeatures)
+  {
+    sort(featureIds.begin(), featureIds.end());
     m_delegate.FilterHotels(filterTasks, move(featureIds));
+  }
 }
 
 void SearchAPI::EnableIndexingOfBookmarksDescriptions(bool enable)
@@ -486,7 +489,9 @@ bool SearchAPI::Search(SearchParams const & params, bool forceSearch)
   // search request.
   CancelQuery(intent.m_handle);
 
-  intent.m_params.m_minDistanceOnMapBetweenResults = m_delegate.GetMinDistanceBetweenResults();
+  intent.m_params.m_minDistanceOnMapBetweenResultsX = m_delegate.GetMinDistanceBetweenResults();
+  intent.m_params.m_minDistanceOnMapBetweenResultsY =
+      intent.m_params.m_minDistanceOnMapBetweenResultsX;
 
   Search(intent);
 

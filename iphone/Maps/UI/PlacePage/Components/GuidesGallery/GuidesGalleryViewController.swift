@@ -76,9 +76,6 @@ extension GuidesGalleryViewController: IGuidesGalleryView {
   func setGalleryItems(_ items: [IGuidesGalleryItemViewModel]) {
     galleryItems = items
     collectionView.reloadData()
-    collectionView.performBatchUpdates(nil) { [weak self] _ in
-      self?.applyTransform()
-    }
   }
 
   func setActiveItem(_ index: Int, animated: Bool) {
@@ -87,6 +84,7 @@ extension GuidesGalleryViewController: IGuidesGalleryView {
       guard let layout = self?.collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
       let itemWidth = layout.itemSize.width + layout.minimumInteritemSpacing
       self?.collectionView.setContentOffset(CGPoint(x: itemWidth * CGFloat(index), y: 0), animated: animated)
+      self?.collectionView.layoutIfNeeded()
       self?.applyTransform()
     }
   }
@@ -125,14 +123,6 @@ fileprivate final class RoutesGalleryLayout: UICollectionViewFlowLayout {
     scrollDirection = .horizontal
     minimumLineSpacing = 8
     minimumInteritemSpacing = 8
-  }
-
-  override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
-    true
-  }
-
-  override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
-    targetContentOffset(forProposedContentOffset: proposedContentOffset, withScrollingVelocity: .zero)
   }
 
   override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint,

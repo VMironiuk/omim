@@ -29,7 +29,7 @@ int const kPositionRoutingOffsetY = 104;
 double const kMinSpeedThresholdMps = 2.8;  // 10 km/h
 double const kGpsBearingLifetimeSec = 5.0;
 double const kMaxPendingLocationTimeSec = 60.0;
-double const kMaxTimeInBackgroundSec = 60.0 * 60;
+double const kMaxTimeInBackgroundSec = 60.0 * 60 * 8;  // 8 hours
 double const kMaxNotFollowRoutingTimeSec = 20.0;
 double const kMaxUpdateLocationInvervalSec = 30.0;
 double const kMaxBlockAutoZoomTimeSec = 10.0;
@@ -127,11 +127,18 @@ void ResetNotification(uint64_t & notifyId)
 {
   notifyId = DrapeNotifier::kInvalidId;
 }
+
+bool IsModeChangeViewport(location::EMyPositionMode mode)
+{
+  return mode == location::Follow || mode == location::FollowAndRotate;
+}
 }  // namespace
 
 MyPositionController::MyPositionController(Params && params, ref_ptr<DrapeNotifier> notifier)
   : m_notifier(notifier)
-  , m_mode(location::PendingPosition)
+  , m_mode(params.m_isRoutingActive || df::IsModeChangeViewport(params.m_initMode)
+               ? location::PendingPosition
+               : location::NotFollowNoPosition)
   , m_desiredInitMode(params.m_initMode)
   , m_modeChangeCallback(std::move(params.m_myPositionModeCallback))
   , m_hints(params.m_hints)
@@ -158,7 +165,6 @@ MyPositionController::MyPositionController(Params && params, ref_ptr<DrapeNotifi
   , m_isDirectionAssigned(false)
   , m_isCompassAvailable(false)
   , m_positionIsObsolete(false)
-  , m_allowToFollowAfterObsoletePosition(true)
   , m_needBlockAutoZoom(false)
   , m_locationWaitingNotifyId(DrapeNotifier::kInvalidId)
   , m_routingNotFollowNotifyId(DrapeNotifier::kInvalidId)
@@ -173,10 +179,10 @@ MyPositionController::MyPositionController(Params && params, ref_ptr<DrapeNotifi
   else if (m_hints.m_isLaunchByDeepLink)
   {
     m_desiredInitMode = location::NotFollow;
-    m_allowToFollowAfterObsoletePosition = false;
   }
   else if (params.m_timeInBackground >= kMaxTimeInBackgroundSec)
   {
+    m_mode = location::PendingPosition;
     m_desiredInitMode = location::Follow;
   }
 
@@ -223,7 +229,7 @@ double MyPositionController::GetHorizontalAccuracy() const
 
 bool MyPositionController::IsModeChangeViewport() const
 {
-  return m_mode == location::Follow || m_mode == location::FollowAndRotate;
+  return df::IsModeChangeViewport(m_mode);
 }
 
 bool MyPositionController::IsModeHasPosition() const
@@ -235,7 +241,6 @@ void MyPositionController::DragStarted()
 {
   m_needBlockAnimation = true;
 
-  m_allowToFollowAfterObsoletePosition = false;
   if (m_mode == location::PendingPosition)
     ChangeMode(location::NotFollowNoPosition);
 }
@@ -255,7 +260,6 @@ void MyPositionController::ScaleStarted()
   m_needBlockAnimation = true;
   ResetBlockAutoZoomTimer();
 
-  m_allowToFollowAfterObsoletePosition = false;
   if (m_mode == location::PendingPosition)
     ChangeMode(location::NotFollowNoPosition);
 }
@@ -275,8 +279,6 @@ void MyPositionController::ScaleEnded()
 
 void MyPositionController::Rotated()
 {
-  m_allowToFollowAfterObsoletePosition = false;
-
   if (m_mode == location::PendingPosition)
     ChangeMode(location::NotFollowNoPosition);
   else if (m_mode == location::FollowAndRotate)
@@ -443,7 +445,6 @@ void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool
     m_isDirtyViewport = true;
   }
 
-  auto const previousPositionIsObsolete = m_positionIsObsolete;
   using namespace std::chrono;
   auto const delta =
     duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - info.m_timestamp;
@@ -511,19 +512,6 @@ void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool
           ChangeModelView(m_position, kMaxScaleZoomLevel);
         }
       }
-    }
-  }
-  else if (m_mode == location::NotFollow)
-  {
-    // If we are on the start, the first known location is obsolete, the new one has come and
-    // we didn't touch the map. In this case we allow to go from NotFollow to Follow.
-    if (!m_hints.m_isFirstLaunch && m_allowToFollowAfterObsoletePosition &&
-        previousPositionIsObsolete && !m_positionIsObsolete)
-    {
-      ChangeMode(location::Follow);
-      ChangeModelView(m_position, kDoNotChangeZoom);
-
-      m_allowToFollowAfterObsoletePosition = false;
     }
   }
   else if (m_mode == location::NotFollowNoPosition)
@@ -704,18 +692,22 @@ void MyPositionController::StopLocationFollow()
   if (m_mode == location::PendingPosition)
     ChangeMode(location::NotFollowNoPosition);
 
-  m_allowToFollowAfterObsoletePosition = false;
-
   ResetRoutingNotFollowTimer();
 }
 
-void MyPositionController::SetTimeInBackground(double time)
+void MyPositionController::OnEnterForeground(double backgroundTime)
 {
-  if (time >= kMaxTimeInBackgroundSec && m_mode == location::NotFollow)
+  if (backgroundTime >= kMaxTimeInBackgroundSec && m_mode == location::NotFollow)
   {
     ChangeMode(m_isInRouting ? location::FollowAndRotate : location::Follow);
     UpdateViewport(kDoNotChangeZoom);
   }
+}
+
+void MyPositionController::OnEnterBackground()
+{
+  if (!m_isInRouting && !df::IsModeChangeViewport(m_mode))
+    ChangeMode(location::NotFollowNoPosition);
 }
 
 void MyPositionController::OnCompassTapped()

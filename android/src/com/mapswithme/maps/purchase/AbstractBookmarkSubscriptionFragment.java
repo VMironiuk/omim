@@ -2,6 +2,7 @@ package com.mapswithme.maps.purchase;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +17,7 @@ import com.android.billingclient.api.SkuDetails;
 import com.mapswithme.maps.Framework;
 import com.mapswithme.maps.R;
 import com.mapswithme.maps.base.BaseAuthFragment;
+import com.mapswithme.maps.bookmarks.AuthBundleFactory;
 import com.mapswithme.maps.bookmarks.data.BookmarkManager;
 import com.mapswithme.maps.dialog.AlertDialog;
 import com.mapswithme.maps.dialog.AlertDialogCallback;
@@ -70,10 +72,6 @@ abstract class AbstractBookmarkSubscriptionFragment extends BaseAuthFragment
     mPurchaseController.initialize(requireActivity());
     mPingCallback.attach(this);
     BookmarkManager.INSTANCE.addCatalogPingListener(mPingCallback);
-    Statistics.INSTANCE.trackPurchasePreviewShow(getSubscriptionType().getServerId(),
-                                                 getSubscriptionType().getVendor(),
-                                                 getSubscriptionType().getYearlyProductId(),
-                                                 getExtraFrom());
     View root = onSubscriptionCreateView(inflater, container, savedInstanceState);
     mDelegate = createFragmentDelegate(this);
     if (root != null)
@@ -110,6 +108,11 @@ abstract class AbstractBookmarkSubscriptionFragment extends BaseAuthFragment
     }
 
     activateState(BookmarkSubscriptionPaymentState.CHECK_NETWORK_CONNECTION);
+  }
+
+  protected void authorize()
+  {
+    authorize(AuthBundleFactory.subscription());
   }
 
   @Override
@@ -276,6 +279,12 @@ abstract class AbstractBookmarkSubscriptionFragment extends BaseAuthFragment
   public void onPriceSelection()
   {
     mDelegate.onPriceSelection();
+    ProductDetails details = getProductDetailsForPeriod(PurchaseUtils.Period.P1Y);
+    boolean isTrial = !TextUtils.isEmpty(details.getFreeTrialPeriod());
+    Statistics.INSTANCE.trackPurchasePreviewShow(getSubscriptionType().getServerId(),
+                                                 getSubscriptionType().getVendor(),
+                                                 getSubscriptionType().getYearlyProductId(),
+                                                 getExtraFrom(), isTrial);
   }
 
   @Override
@@ -432,8 +441,11 @@ abstract class AbstractBookmarkSubscriptionFragment extends BaseAuthFragment
 
   void trackYearlyProductSelected()
   {
+    ProductDetails details = getProductDetailsForPeriod(PurchaseUtils.Period.P1Y);
+    boolean isTrial = !TextUtils.isEmpty(details.getFreeTrialPeriod());
     Statistics.INSTANCE.trackPurchasePreviewSelect(getSubscriptionType().getServerId(),
-                                                   getSubscriptionType().getYearlyProductId());
+                                                   getSubscriptionType().getYearlyProductId(),
+                                                   isTrial);
   }
 
   void trackMonthlyProductSelected()

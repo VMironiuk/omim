@@ -1789,8 +1789,10 @@
 	<string name="connection_error_dialog_guides_try">Zkusit znovu</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Vypnout</string>
 	<string name="connection_error_toast_guides">Probíhá pokus o opětovné připojení</string>
-	<string name="routes_card_show">Zobrazit</string>
-	<string name="routes_card_hide">Skrýt</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Ukázat na mapě</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Skrýt na mapě</string>
 	<string name="whatsnew_catalog_new_title">Nový katalog průvodců a tisíce nápadů na cestování</string>
 	<string name="whatsnew_catalog_new_message">Aktualizovali jsme katalog průvodců a přidali jsme překlady ve všech jazycích. Začněte plánovat dopředu!</string>
 	<string name="whatsnew_elevation_profile_title">Výškový profil v cestovních průvodcích</string>
@@ -1881,6 +1883,15 @@
 	<string name="type.amenity.pub">Hospoda</string>
 	<string name="type.amenity.public_bookcase">Knihovna</string>
 	<string name="type.amenity.recycling">Recyklační středisko</string>
+	<string name="type.amenity.recycling_container">Recyklační nádoba</string>
+	<string name="type.recycling.toxic">Toxický odpad</string>
+	<string name="type.recycling.clothes">Staré oblečení</string>
+	<string name="type.recycling.glass_bottles">Skleněné lahve</string>
+	<string name="type.recycling.paper">Papírový odpad</string>
+	<string name="type.recycling.plastic">Plastový odpad</string>
+	<string name="type.recycling.plastic_bottles">Plastové lahve</string>
+	<string name="type.recycling.scrap_metal">Kovový šrot</string>
+	<string name="type.recycling.small_appliances">Elektronický odpad</string>
 	<string name="type.amenity.restaurant">Restaurace</string>
 	<string name="type.amenity.school">Škola</string>
 	<string name="type.amenity.shelter">Přístřešek</string>
@@ -2025,6 +2036,7 @@
 	<string name="type.highway.footway.mountain_hiking">Cesta</string>
 	<string name="type.highway.footway.permissive">Cesta</string>
 	<string name="type.highway.footway.tunnel">Cesta</string>
+	<string name="type.highway.ford">Brod</string>
 	<string name="type.highway.living_street">Ulice</string>
 	<string name="type.highway.living_street.bridge">Ulice</string>
 	<string name="type.highway.living_street.tunnel">Ulice</string>

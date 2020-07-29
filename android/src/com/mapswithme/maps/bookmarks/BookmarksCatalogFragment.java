@@ -31,6 +31,7 @@ import com.mapswithme.maps.PrivateVariables;
 import com.mapswithme.maps.R;
 import com.mapswithme.maps.auth.BaseWebViewMwmFragment;
 import com.mapswithme.maps.auth.TargetFragmentCallback;
+import com.mapswithme.maps.bookmarks.data.BookmarkCategory;
 import com.mapswithme.maps.bookmarks.data.BookmarkManager;
 import com.mapswithme.maps.dialog.AlertDialog;
 import com.mapswithme.maps.dialog.AlertDialogCallback;
@@ -106,7 +107,9 @@ public class BookmarksCatalogFragment extends BaseWebViewMwmFragment
   public void onCreate(@Nullable Bundle savedInstanceState)
   {
     super.onCreate(savedInstanceState);
-    mDelegate = new BookmarksDownloadFragmentDelegate(this);
+    Bundle extra = requireActivity().getIntent()
+                                    .getBundleExtra(BookmarksCatalogActivity.EXTRA_ARGS);
+    mDelegate = new BookmarksDownloadFragmentDelegate(this, extra);
     mDelegate.onCreate(savedInstanceState);
     mInvalidSubsDialogCallback = new InvalidSubscriptionAlertDialogCallback(this);
   }
@@ -352,6 +355,7 @@ public class BookmarksCatalogFragment extends BaseWebViewMwmFragment
   private static class WebViewBookmarksCatalogClient extends WebViewClient
   {
     private static final String SUBSCRIBE_PATH_SEGMENT = "subscribe";
+    private static final String VIEW_ON_MAP_PATH_SEGMENT = "map";
     private final Logger LOGGER = LoggerFactory.INSTANCE.getLogger(LoggerFactory.Type.BILLING);
     private final String TAG = WebViewBookmarksCatalogClient.class.getSimpleName();
 
@@ -373,20 +377,52 @@ public class BookmarksCatalogFragment extends BaseWebViewMwmFragment
       if (fragment == null)
         return false;
 
-      boolean result = fragment.downloadBookmark(url);
+      if (fragment.downloadBookmark(url))
+        return true;
 
       Uri uri = Uri.parse(url);
       List<String> pathSegments = uri.getPathSegments();
       for (String each : pathSegments)
       {
         if (TextUtils.equals(each, SUBSCRIBE_PATH_SEGMENT))
-        {
-          String group = PurchaseUtils.getTargetBookmarkGroupFromUri(uri);
-          openSubscriptionScreen(SubscriptionType.getTypeByBookmarksGroup(group));
-          return true;
-        }
+          return handleSubscriptionUri(uri);
+
+        if (TextUtils.equals(each, VIEW_ON_MAP_PATH_SEGMENT))
+          return handleViewOnMapUri(fragment, uri);
       }
-      return result;
+
+      return false;
+    }
+
+    private boolean handleViewOnMapUri(@NonNull BookmarksCatalogFragment fragment, @NonNull Uri uri)
+    {
+      String serverId = uri.getQueryParameter(PurchaseUtils.SERVER_ID);
+      if (TextUtils.isEmpty(serverId))
+        return false;
+
+      BookmarkCategory category;
+      try
+      {
+        category = BookmarkManager.INSTANCE.getCategoryByServerId(serverId);
+      }
+      catch (Throwable e)
+      {
+        CrashlyticsUtils.logException(e);
+        return false;
+      }
+
+      Intent intent = new Intent().putExtra(BookmarksCatalogActivity.EXTRA_DOWNLOADED_CATEGORY,
+                                            category);
+      fragment.requireActivity().setResult(Activity.RESULT_OK, intent);
+      fragment.requireActivity().finish();
+      return true;
+    }
+
+    private boolean handleSubscriptionUri(@NonNull Uri uri)
+    {
+      String group = PurchaseUtils.getTargetBookmarkGroupFromUri(uri);
+      openSubscriptionScreen(SubscriptionType.getTypeByBookmarksGroup(group));
+      return true;
     }
 
     private void openSubscriptionScreen(@NonNull SubscriptionType type)

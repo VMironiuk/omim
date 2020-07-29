@@ -1788,8 +1788,10 @@
 	<string name="connection_error_dialog_guides_try">再試一次</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">關閉</string>
 	<string name="connection_error_toast_guides">恢復網絡連接</string>
-	<string name="routes_card_show">顯示</string>
-	<string name="routes_card_hide">隱藏</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">在地圖上顯示</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">在地圖上隱藏</string>
 	<string name="whatsnew_catalog_new_title">新目錄和數千個理想度假勝地</string>
 	<string name="whatsnew_catalog_new_message">我們更新了指南目錄，並添加了所有語言的翻譯。開始提前計劃！</string>
 	<string name="whatsnew_elevation_profile_title">指南中的高度剖面圖</string>
@@ -1883,6 +1885,15 @@
 	<string name="type.amenity.pub">酒館</string>
 	<string name="type.amenity.public_bookcase">書架</string>
 	<string name="type.amenity.recycling">回收中心</string>
+	<string name="type.amenity.recycling_container">回收箱</string>
+	<string name="type.recycling.toxic">有毒垃圾</string>
+	<string name="type.recycling.clothes">舊衣物</string>
+	<string name="type.recycling.glass_bottles">玻璃瓶</string>
+	<string name="type.recycling.paper">廢紙</string>
+	<string name="type.recycling.plastic">廢塑料</string>
+	<string name="type.recycling.plastic_bottles">塑料瓶</string>
+	<string name="type.recycling.scrap_metal">廢金屬</string>
+	<string name="type.recycling.small_appliances">電子垃圾</string>
 	<string name="type.amenity.restaurant">餐廳</string>
 	<string name="type.amenity.school">學校</string>
 	<string name="type.amenity.shelter">隱藏處</string>
@@ -2028,6 +2039,7 @@
 	<string name="type.highway.footway.mountain_hiking">人行步道</string>
 	<string name="type.highway.footway.permissive">人行步道</string>
 	<string name="type.highway.footway.tunnel">人行步道</string>
+	<string name="type.highway.ford">淺灘</string>
 	<string name="type.highway.living_street">路</string>
 	<string name="type.highway.living_street.bridge">路</string>
 	<string name="type.highway.living_street.tunnel">路</string>

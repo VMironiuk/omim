@@ -1776,8 +1776,10 @@
 	<string name="connection_error_dialog_guides_try">Încercați din nou</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Opriți</string>
 	<string name="connection_error_toast_guides">Restabilim conexiunea la Internet</string>
-	<string name="routes_card_show">Arată</string>
-	<string name="routes_card_hide">Ascunde</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Arată pe hartă</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Ascunde de pe hartă</string>
 	<string name="whatsnew_catalog_new_title">Un nou catalog și mii de idei de vacanță</string>
 	<string name="whatsnew_catalog_new_message">Am actualizat catalogul de ghiduri și am adăugat traduceri în toate limbile. Începeți planificarea înainte!</string>
 	<string name="whatsnew_elevation_profile_title">Profilul înălțimilor în ghiduri</string>
@@ -1864,6 +1866,15 @@
 	<string name="type.amenity.post_office">Oficiu poștal</string>
 	<string name="type.amenity.public_bookcase">Bibliotecă</string>
 	<string name="type.amenity.recycling">Centru de reciclare</string>
+	<string name="type.amenity.recycling_container">Containere pentru reciclare</string>
+	<string name="type.recycling.toxic">Deșeuri toxice</string>
+	<string name="type.recycling.clothes">Haine vechi</string>
+	<string name="type.recycling.glass_bottles">Deșeuri de sticlă</string>
+	<string name="type.recycling.paper">Deșeuri de hârtie</string>
+	<string name="type.recycling.plastic">Deșeuri de plastic</string>
+	<string name="type.recycling.plastic_bottles">Sticle de plastic</string>
+	<string name="type.recycling.scrap_metal">Resturi de metal</string>
+	<string name="type.recycling.small_appliances">Deșeuri electrice</string>
 	<string name="type.amenity.school">Școală</string>
 	<string name="type.amenity.shelter">Adăpost</string>
 	<string name="type.amenity.shower">Duș</string>
@@ -2005,6 +2016,7 @@
 	<string name="type.highway.footway.mountain_hiking">Cale</string>
 	<string name="type.highway.footway.permissive">Cale</string>
 	<string name="type.highway.footway.tunnel">Cale</string>
+	<string name="type.highway.ford">Superficial</string>
 	<string name="type.highway.living_street">Stradă</string>
 	<string name="type.highway.living_street.bridge">Stradă</string>
 	<string name="type.highway.living_street.tunnel">Stradă</string>

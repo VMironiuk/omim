@@ -3,6 +3,7 @@ import FBSDKLoginKit
 import GoogleSignIn
 import SafariServices
 import AuthenticationServices
+import Firebase
 
 @objc enum AuthorizationError: Int {
   case cancelled
@@ -73,6 +74,7 @@ final class AuthorizationViewController: MWMViewController {
     gid.delegate = self
     gid.uiDelegate = self
     gid.signIn()
+    logStatStart(type: .google)
   }
 
   @IBOutlet private var facebookButton: UIButton! {
@@ -90,12 +92,13 @@ final class AuthorizationViewController: MWMViewController {
         self?.process(token: token.tokenString, type: .facebook)
       }
     }
+    logStatStart(type: .facebook)
   }
 
   @IBAction private func phoneSignIn() {
     let authVC = PhoneNumberAuthorizationViewController(success: { [unowned self] token in
       self.dismiss(animated: true)
-      self.process(token: token!, type: .phone)
+      self.process(token: token, type: .phone)
     }, failure: { [unowned self] in
       self.dismiss(animated: true)
       self.process(error: NSError(domain: kMapsmeErrorDomain, code: 0), type: .phone)
@@ -103,6 +106,7 @@ final class AuthorizationViewController: MWMViewController {
     })
     let navVC = MWMNavigationController(rootViewController: authVC)
     self.present(navVC, animated: true)
+    logStatStart(type: .phone)
   }
   
   @IBOutlet private var phoneSignInButton: UIButton! {
@@ -117,12 +121,12 @@ final class AuthorizationViewController: MWMViewController {
   
   @IBAction func onCheck(_ sender: Checkmark) {
     let allButtonsChecked = privacyPolicyCheck.isChecked &&
-      termsOfUseCheck.isChecked;
+      termsOfUseCheck.isChecked
     
-    googleButton.isEnabled = allButtonsChecked;
-    facebookButton.isEnabled = allButtonsChecked;
-    phoneSignInButton.isEnabled = allButtonsChecked;
-    signInAppleButton?.isEnabled = allButtonsChecked;
+    googleButton.isEnabled = allButtonsChecked
+    facebookButton.isEnabled = allButtonsChecked
+    phoneSignInButton.isEnabled = allButtonsChecked
+    signInAppleButton?.isEnabled = allButtonsChecked
     signInAppleButton?.alpha = allButtonsChecked ? 1 : 0.5
   }
   
@@ -163,7 +167,11 @@ final class AuthorizationViewController: MWMViewController {
   private let completionHandler: CompletionHandler?
 
   @objc
-  init(barButtonItem: UIBarButtonItem?, source: AuthorizationSource, successHandler: SuccessHandler? = nil, errorHandler: ErrorHandler? = nil, completionHandler: CompletionHandler? = nil) {
+  init(barButtonItem: UIBarButtonItem?,
+       source: AuthorizationSource,
+       successHandler: SuccessHandler? = nil,
+       errorHandler: ErrorHandler? = nil,
+       completionHandler: CompletionHandler? = nil) {
     self.source = source
     self.successHandler = successHandler
     self.errorHandler = errorHandler
@@ -175,7 +183,12 @@ final class AuthorizationViewController: MWMViewController {
   }
 
   @objc
-  init(popoverSourceView: UIView? = nil, source: AuthorizationSource, permittedArrowDirections: UIPopoverArrowDirection = .unknown, successHandler: SuccessHandler? = nil, errorHandler: ErrorHandler? = nil, completionHandler: CompletionHandler? = nil) {
+  init(popoverSourceView: UIView? = nil,
+       source: AuthorizationSource,
+       permittedArrowDirections: UIPopoverArrowDirection = .unknown,
+       successHandler: SuccessHandler? = nil,
+       errorHandler: ErrorHandler? = nil,
+       completionHandler: CompletionHandler? = nil) {
     self.source = source
     self.successHandler = successHandler
     self.errorHandler = errorHandler
@@ -216,7 +229,9 @@ final class AuthorizationViewController: MWMViewController {
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     iPadSpecific {
-      preferredContentSize = contentView.systemLayoutSizeFitting(preferredContentSize, withHorizontalFittingPriority: .fittingSizeLevel, verticalFittingPriority: .fittingSizeLevel)
+      preferredContentSize = contentView.systemLayoutSizeFitting(preferredContentSize,
+                                                                 withHorizontalFittingPriority: .fittingSizeLevel,
+                                                                 verticalFittingPriority: .fittingSizeLevel)
     }
   }
 
@@ -230,6 +245,7 @@ final class AuthorizationViewController: MWMViewController {
     authorizationController.delegate = self
     authorizationController.presentationContextProvider = self
     authorizationController.performRequests()
+    logStatStart(type: .apple)
   }
 
   @IBAction func onCancel() {
@@ -257,10 +273,10 @@ final class AuthorizationViewController: MWMViewController {
   private func process(error: Error, type: SocialTokenType) {
     Statistics.logEvent(kStatAuthError, withParameters: [
       kStatProvider: getProviderStatStr(type: type),
-      kStatError: error.localizedDescription,
+      kStatError: error.localizedDescription
     ])
     textLabel.text = L("profile_authorization_error")
-    Crashlytics.sharedInstance().recordError(error)
+    Crashlytics.crashlytics().record(error: error)
   }
 
   private func process(token: String,
@@ -276,7 +292,7 @@ final class AuthorizationViewController: MWMViewController {
                       promoAccepted: latestNewsCheck.isChecked,
                       firstName: firstName,
                       lastName: lastName) { success in
-                        self.logStats(type: type, success: success)
+                        self.logStatEnd(type: type, success: success)
                         if success {
                           self.successHandler?(type)
                         } else {
@@ -286,25 +302,22 @@ final class AuthorizationViewController: MWMViewController {
     onClose()
   }
 
-  private func logStats(type: SocialTokenType, success: Bool) {
-    let provider: String
-    switch type {
-    case .google:
-      provider = kStatGoogle
-    case .facebook:
-      provider = kStatFacebook
-    case .phone:
-      provider = kStatPhone
-    case .apple:
-      provider = kStatApple
-    @unknown default:
-      fatalError()
+  private func logStatStart(type: SocialTokenType) {
+    var agreements = [kStatAgreePrivacy, kStatAgreeTerms]
+    if latestNewsCheck.isChecked {
+      agreements.append(kStatAgreeNews)
     }
+    Statistics.logEvent(kStatAuthStart, withParameters: [kStatFrom: source.stat,
+                                                         kStatProvider: getProviderStatStr(type: type),
+                                                         kStatAgree: agreements])
+  }
 
+  private func logStatEnd(type: SocialTokenType, success: Bool) {
+    let provider = getProviderStatStr(type: type)
     if success {
-      Statistics.logEvent(kStatAuthRequestSucces, withParameters: [kStatProvider : provider])
+      Statistics.logEvent(kStatAuthRequestSucces, withParameters: [kStatProvider: provider])
     } else {
-      Statistics.logEvent(kStatAuthError, withParameters: [kStatProvider : provider, kStatError : ""])
+      Statistics.logEvent(kStatAuthError, withParameters: [kStatProvider: provider, kStatError: ""])
     }
   }
 }
@@ -326,7 +339,7 @@ extension AuthorizationViewController: UITextViewDelegate {
   func textView(_ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange) -> Bool {
     let safari = SFSafariViewController(url: URL)
     self.present(safari, animated: true, completion: nil)
-    return false;
+    return false
   }
 }
 

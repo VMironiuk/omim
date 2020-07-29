@@ -3282,9 +3282,11 @@
 
 "connection_error_toast_guides" = "Restablecemos la conexión a Internet";
 
-"routes_card_show" = "Mostrar";
+/* as few symbols as possible */
+"routes_card_show" = "Mostrar en el mapa";
 
-"routes_card_hide" = "Ocultar";
+/* as few symbols as possible */
+"routes_card_hide" = "Ocultar en el mapa";
 
 "whatsnew_catalog_new_title" = "Nuevo catálogo de guías y miles de ideas para descansar";
 
@@ -3313,6 +3315,45 @@
 "routes_card_routes_tag" = "Itinerario";
 
 "routes_card_set_tag" = "Lugares destacados";
+
+/* FIXME */
+"guides_trial_cta_button" = "guides_trial_cta_button";
+
+/* FIXME */
+"guides_trial_message" = "guides_trial_message%s";
+
+/* FIXME */
+"trial_error_dialog" = "trial_error_dialog";
+
+/* FIXME */
+"floating_button_filters" = "Filters";
+
+/* FIXME */
+"date_picker_сhoose_dates_cta" = "Choose dates";
+
+/* FIXME */
+"guests_picker_rooms" = "Rooms";
+
+/* FIXME */
+"guests_picker_adults" = "Adults";
+
+/* FIXME */
+"guests_picker_children_title" = "Children";
+
+/* FIXME */
+"guests_picker_children_subtitle" = "3-16 y.o.";
+
+/* FIXME */
+"guests_picker_infants_title" = "Infants";
+
+/* FIXME */
+"guests_picker_infants_subtitle" = "0-3 y.o.";
+
+/* FIXME */
+"booking_map_component_availability" = "No rooms";
+
+/* FIXME */
+"booking_map_component_filters" = "Out of filters";
 
 
 /**********  Partners  **********/
@@ -3524,17 +3565,17 @@
 
 "type.recycling.clothes" = "Ropa vieja";
 
-"type.recycling.glass_bottles" = "Vidrio";
+"type.recycling.glass_bottles" = "Cascos de botellas";
 
-"type.recycling.paper" = "Papel de desecho";
+"type.recycling.paper" = "Desperdicio de papel";
 
-"type.recycling.plastic" = "Residuos plásticos";
+"type.recycling.plastic" = "Residuos de plástico";
 
 "type.recycling.plastic_bottles" = "Botellas de plástico";
 
-"type.recycling.scrap_metal" = "Chatarra";
+"type.recycling.scrap_metal" = "Residuos de metal";
 
-"type.recycling.small_appliances" = "Chatarra electrónica";
+"type.recycling.small_appliances" = "Residuos electrónicos";
 
 "type.amenity.restaurant" = "Restaurante";
 
@@ -3908,7 +3949,7 @@
 
 "type.highway.footway.tunnel" = "Camino";
 
-"type.highway.ford" = "Ford";
+"type.highway.ford" = "Vado (de lugar)";
 
 "type.highway.living_street" = "Calle";
 
@@ -4131,6 +4172,8 @@
 "type.hwtag" = "hwtag";
 
 "type.hwtag.bidir_bicycle" = "hwtag-bidir_bicycle";
+
+"type.hwtag.onedir_bicycle" = "hwtag-onedir_bicycle";
 
 "type.hwtag.lit" = "hwtag-lit";
 

@@ -1,46 +1,86 @@
 @IBDesignable
-class VerticallyAlignedButton: MWMButton {
+class VerticallyAlignedButton: UIControl {
   @IBInspectable
-  var spacing: CGFloat = 4
+  var image: UIImage? {
+    didSet {
+      imageView.image = image
+    }
+  }
+
+  @IBInspectable
+  var title: String? {
+    didSet {
+      if localizedText == nil {
+        titleLabel.text = title
+      }
+    }
+  }
+
+  @IBInspectable
+  var localizedText: String? {
+    didSet {
+      if let localizedText = localizedText {
+        titleLabel.text = L(localizedText)
+      }
+    }
+  }
+
+  @IBInspectable
+  var spacing: CGFloat = 4 {
+    didSet {
+      spacingConstraint.constant = spacing
+    }
+  }
+
+  @IBInspectable
+  var numberOfLines: Int {
+    get {
+      return titleLabel.numberOfLines
+    }
+    set {
+      titleLabel.numberOfLines = newValue
+    }
+  }
+
+  private lazy var spacingConstraint: NSLayoutConstraint = {
+    let spacingConstraint = titleLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: spacing)
+    return spacingConstraint
+  }()
+
+  lazy var titleLabel: UILabel = {
+    let titleLabel = UILabel()
+    titleLabel.textAlignment = .center
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+    return titleLabel
+  }()
+
+  lazy var imageView: UIImageView = {
+    let imageView = UIImageView()
+    imageView.contentMode = .center
+    imageView.translatesAutoresizingMaskIntoConstraints = false
+    return imageView
+  }()
 
   override init(frame: CGRect) {
     super.init(frame: frame)
-    titleLabel?.textAlignment = .center
+    setupView()
   }
 
   required init?(coder aDecoder: NSCoder) {
     super.init(coder: aDecoder)
-    titleLabel?.textAlignment = .center
+    setupView()
   }
 
-  override func contentRect(forBounds bounds: CGRect) -> CGRect {
-    let w = CGFloat.maximum(intrinsicContentSize.width, bounds.width)
-    let h = CGFloat.maximum(intrinsicContentSize.height, bounds.height)
-    return CGRect(x: bounds.minX, y: bounds.minY, width: w, height: h)
-  }
+  private func setupView() {
+    addSubview(titleLabel)
+    addSubview(imageView)
 
-  override func titleRect(forContentRect contentRect: CGRect) -> CGRect {
-    let titleRect = super.titleRect(forContentRect: contentRect)
-    return CGRect(x: contentRect.minX,
-                  y: contentRect.height - titleRect.height,
-                  width: contentRect.width,
-                  height: titleRect.height)
-  }
-
-  override func imageRect(forContentRect contentRect: CGRect) -> CGRect {
-    let imageRect = super.imageRect(forContentRect: contentRect)
-    return CGRect(x: floor((contentRect.width - imageRect.width) / 2),
-                  y: 0,
-                  width: imageRect.width,
-                  height: imageRect.height)
-  }
-
-  override var intrinsicContentSize: CGSize {
-    let r = CGRect(x: 0, y: 0, width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-    let imageRect = super.imageRect(forContentRect: r)
-    let titleRect = super.titleRect(forContentRect: r)
-    let w = CGFloat.maximum(imageRect.width, titleRect.width)
-
-    return CGSize(width: w, height: imageRect.height + titleRect.height + spacing)
+    NSLayoutConstraint.activate([
+      imageView.topAnchor.constraint(equalTo: topAnchor),
+      imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+      titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
+      titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
+      spacingConstraint
+    ])
   }
 }

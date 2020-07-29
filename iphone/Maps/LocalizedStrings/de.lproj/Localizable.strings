@@ -3282,9 +3282,11 @@
 
 "connection_error_toast_guides" = "Die Internetverbindung wird hergestellt";
 
-"routes_card_show" = "Einblenden";
+/* as few symbols as possible */
+"routes_card_show" = "Auf der Karte einblenden";
 
-"routes_card_hide" = "Ausblenden";
+/* as few symbols as possible */
+"routes_card_hide" = "Auf der Karte ausblenden";
 
 "whatsnew_catalog_new_title" = "Neuer Katalog und tausende Erholungsideen";
 
@@ -3313,6 +3315,45 @@
 "routes_card_routes_tag" = "Route";
 
 "routes_card_set_tag" = "Selektion der Plätze";
+
+/* FIXME */
+"guides_trial_cta_button" = "guides_trial_cta_button";
+
+/* FIXME */
+"guides_trial_message" = "guides_trial_message%s";
+
+/* FIXME */
+"trial_error_dialog" = "trial_error_dialog";
+
+/* FIXME */
+"floating_button_filters" = "Filters";
+
+/* FIXME */
+"date_picker_сhoose_dates_cta" = "Choose dates";
+
+/* FIXME */
+"guests_picker_rooms" = "Rooms";
+
+/* FIXME */
+"guests_picker_adults" = "Adults";
+
+/* FIXME */
+"guests_picker_children_title" = "Children";
+
+/* FIXME */
+"guests_picker_children_subtitle" = "3-16 y.o.";
+
+/* FIXME */
+"guests_picker_infants_title" = "Infants";
+
+/* FIXME */
+"guests_picker_infants_subtitle" = "0-3 y.o.";
+
+/* FIXME */
+"booking_map_component_availability" = "No rooms";
+
+/* FIXME */
+"booking_map_component_filters" = "Out of filters";
 
 
 /**********  Partners  **********/
@@ -3518,19 +3559,19 @@
 
 "type.amenity.recycling" = "Recyclinghof";
 
-"type.amenity.recycling_container" = "Recyclingbehälter";
+"type.amenity.recycling_container" = "Wertstoffcontainer";
 
 "type.recycling.toxic" = "Giftmüll";
 
-"type.recycling.clothes" = "Alte Kleidung";
+"type.recycling.clothes" = "Altkleider";
 
-"type.recycling.glass_bottles" = "Glas-Container";
+"type.recycling.glass_bottles" = "Glas";
 
-"type.recycling.paper" = "Altpapier";
+"type.recycling.paper" = "Papier";
 
-"type.recycling.plastic" = "Plastik-Müll";
+"type.recycling.plastic" = "Kunststoff";
 
-"type.recycling.plastic_bottles" = "Plastic bottles";
+"type.recycling.plastic_bottles" = "Plastikflaschen";
 
 "type.recycling.scrap_metal" = "Altmetall";
 
@@ -3908,7 +3949,7 @@
 
 "type.highway.footway.tunnel" = "Fußgängertunnel";
 
-"type.highway.ford" = "Ford";
+"type.highway.ford" = "Furt";
 
 "type.highway.living_street" = "Spielstraße";
 
@@ -4131,6 +4172,8 @@
 "type.hwtag" = "hwtag";
 
 "type.hwtag.bidir_bicycle" = "hwtag-bidir_bicycle";
+
+"type.hwtag.onedir_bicycle" = "hwtag-onedir_bicycle";
 
 "type.hwtag.lit" = "hwtag-lit";
 

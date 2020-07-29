@@ -1,17 +1,23 @@
 #include "indexer/search_string_utils.hpp"
+
 #include "indexer/string_set.hpp"
+#include "indexer/transliteration_loader.hpp"
+
+#include "coding/transliteration.hpp"
+
+#include "coding/transliteration.hpp"
 
 #include "base/assert.hpp"
 #include "base/dfa_helpers.hpp"
 #include "base/macros.hpp"
 #include "base/mem_trie.hpp"
 
-#include "3party/utfcpp/source/utf8/unchecked.h"
-
 #include <algorithm>
 #include <memory>
 #include <queue>
 #include <vector>
+
+#include "3party/utfcpp/source/utf8/unchecked.h"
 
 using namespace std;
 using namespace strings;
@@ -54,6 +60,18 @@ void RemoveNumeroSigns(UniString & s)
 
     i = j;
   }
+}
+
+void TransliterateHiraganaToKatakana(UniString & s)
+{
+  // Transliteration is heavy. Check we have any hiragana symbol before transliteration.
+  if (!base::AnyOf(s, [](UniChar c){ return c >= 0x3041 && c<= 0x309F; }))
+    return;
+
+  InitTransliterationInstanceWithDefaultDirs();
+  string out;
+  if (Transliteration::Instance().TransliterateForce(strings::ToUtf8(s), "Hiragana-Katakana", out))
+    s = MakeUniString(out);
 }
 }  // namespace
 
@@ -131,6 +149,7 @@ UniString NormalizeAndSimplifyString(string const & s)
 
   MakeLowerCaseInplace(uniString);
   NormalizeInplace(uniString);
+  TransliterateHiraganaToKatakana(uniString);
 
   // Remove accents that can appear after NFKD normalization.
   uniString.erase_if([](UniChar const & c) {
@@ -251,6 +270,50 @@ public:
 
   using Trie = base::MemTrie<UniString, BooleanSum, base::VectorMoves>;
 
+  static StreetsSynonymsHolder const & Instance()
+  {
+    static const StreetsSynonymsHolder holder;
+    return holder;
+  }
+
+  bool MatchPrefix(UniString const & s) const { return m_strings.HasPrefix(s); }
+  bool FullMatch(UniString const & s) const { return m_strings.HasKey(s); }
+
+  template <typename DFA>
+  bool MatchWithMisprints(DFA const & dfa) const
+  {
+    using TrieIt = Trie::Iterator;
+    using State = pair<TrieIt, typename DFA::Iterator>;
+
+    auto const trieRoot = m_strings.GetRootIterator();
+
+    queue<State> q;
+    q.emplace(trieRoot, dfa.Begin());
+
+    while (!q.empty())
+    {
+      auto const p = q.front();
+      q.pop();
+
+      auto const & currTrieIt = p.first;
+      auto const & currDfaIt = p.second;
+
+      if (currDfaIt.Accepts())
+        return true;
+
+      currTrieIt.ForEachMove([&q, &currDfaIt](UniChar const & c, TrieIt const & nextTrieIt) {
+        auto nextDfaIt = currDfaIt;
+        nextDfaIt.Move(c);
+        strings::DFAMove(nextDfaIt, nextTrieIt.GetLabel());
+        if (!nextDfaIt.Rejects())
+          q.emplace(nextTrieIt, nextDfaIt);
+      });
+    }
+
+    return false;
+  }
+
+private:
   StreetsSynonymsHolder()
   {
     char const * affics[] =
@@ -344,48 +407,9 @@ public:
     }
   }
 
-  bool MatchPrefix(UniString const & s) const { return m_strings.HasPrefix(s); }
-  bool FullMatch(UniString const & s) const { return m_strings.HasKey(s); }
-
-  template <typename DFA>
-  bool MatchWithMisprints(DFA const & dfa) const
-  {
-    using TrieIt = Trie::Iterator;
-    using State = pair<TrieIt, typename DFA::Iterator>;
-
-    auto const trieRoot = m_strings.GetRootIterator();
-
-    queue<State> q;
-    q.emplace(trieRoot, dfa.Begin());
-
-    while (!q.empty())
-    {
-      auto const p = q.front();
-      q.pop();
-
-      auto const & currTrieIt = p.first;
-      auto const & currDfaIt = p.second;
-
-      if (currDfaIt.Accepts())
-        return true;
-
-      currTrieIt.ForEachMove([&q, &currDfaIt](UniChar const & c, TrieIt const & nextTrieIt) {
-        auto nextDfaIt = currDfaIt;
-        nextDfaIt.Move(c);
-        strings::DFAMove(nextDfaIt, nextTrieIt.GetLabel());
-        if (!nextDfaIt.Rejects())
-          q.emplace(nextTrieIt, nextDfaIt);
-      });
-    }
-
-    return false;
-  }
-
-private:
   Trie m_strings;
 };
 
-StreetsSynonymsHolder g_streets;
 }  // namespace
 
 string DropLastToken(string const & str)
@@ -430,26 +454,23 @@ UniString GetStreetNameAsKey(string const & name, bool ignoreStreetSynonyms)
   return (res.empty() ? NormalizeAndSimplifyString(name) : res);
 }
 
-bool IsStreetSynonym(UniString const & s)
-{
-  return g_streets.FullMatch(s);
-}
+bool IsStreetSynonym(UniString const & s) { return StreetsSynonymsHolder::Instance().FullMatch(s); }
 
 bool IsStreetSynonymPrefix(UniString const & s)
 {
-  return g_streets.MatchPrefix(s);
+  return StreetsSynonymsHolder::Instance().MatchPrefix(s);
 }
 
 bool IsStreetSynonymWithMisprints(UniString const & s)
 {
   auto const dfa = BuildLevenshteinDFA(s);
-  return g_streets.MatchWithMisprints(dfa);
+  return StreetsSynonymsHolder::Instance().MatchWithMisprints(dfa);
 }
 
 bool IsStreetSynonymPrefixWithMisprints(UniString const & s)
 {
   auto const dfa = strings::PrefixDFAModifier<strings::LevenshteinDFA>(BuildLevenshteinDFA(s));
-  return g_streets.MatchWithMisprints(dfa);
+  return StreetsSynonymsHolder::Instance().MatchWithMisprints(dfa);
 }
 
 bool ContainsNormalized(string const & str, string const & substr)

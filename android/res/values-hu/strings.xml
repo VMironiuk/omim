@@ -1787,8 +1787,10 @@
 	<string name="connection_error_dialog_guides_try">Próbálja újra</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Kapcsolja ki</string>
 	<string name="connection_error_toast_guides">Újracsatlakozás</string>
-	<string name="routes_card_show">Mutat</string>
-	<string name="routes_card_hide">Elrejt</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Térképen megjelenítés</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Térképről elrejtés</string>
 	<string name="whatsnew_catalog_new_title">Új útmutatók katalógusa és több ezer utazási ötlet</string>
 	<string name="whatsnew_catalog_new_message">Frissítettük az útmutatók katalógusát és minden nyelven hozzáadtuk a fordításokat. Tervezze meg előre utazását!</string>
 	<string name="whatsnew_elevation_profile_title">Emelkedési profil az utazási útmutatókban</string>
@@ -1881,6 +1883,15 @@
 	<string name="type.amenity.pub">Kocsma</string>
 	<string name="type.amenity.public_bookcase">Nyilvános könyvespolc</string>
 	<string name="type.amenity.recycling">Újrahasznosító központ</string>
+	<string name="type.amenity.recycling_container">Újrahasznosító tartály</string>
+	<string name="type.recycling.toxic">Mérgező hulladék</string>
+	<string name="type.recycling.clothes">Régi ruhák</string>
+	<string name="type.recycling.glass_bottles">Üveg palackok</string>
+	<string name="type.recycling.paper">Papír hulladék</string>
+	<string name="type.recycling.plastic">Műanyag hulladék</string>
+	<string name="type.recycling.plastic_bottles">Műanyag palackok</string>
+	<string name="type.recycling.scrap_metal">Fémhulladék</string>
+	<string name="type.recycling.small_appliances">Elektromos hulladék</string>
 	<string name="type.amenity.restaurant">Étterem</string>
 	<string name="type.amenity.school">Iskola</string>
 	<string name="type.amenity.shelter">Menedék</string>
@@ -2025,6 +2036,7 @@
 	<string name="type.highway.footway.mountain_hiking">Ösvény</string>
 	<string name="type.highway.footway.permissive">Ösvény</string>
 	<string name="type.highway.footway.tunnel">Ösvény</string>
+	<string name="type.highway.ford">Gázló</string>
 	<string name="type.highway.living_street">Utca</string>
 	<string name="type.highway.living_street.bridge">Utca</string>
 	<string name="type.highway.living_street.tunnel">Utca</string>

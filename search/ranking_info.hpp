@@ -68,6 +68,9 @@ struct RankingInfo
   // Number of misprints.
   ErrorsMade m_errorsMade;
 
+  // alt_name or old_name is used.
+  bool m_isAltOrOldName = false;
+
   // Query tokens number.
   size_t m_numTokens = 0;
 
@@ -110,6 +113,9 @@ struct RankingInfo
 
   // True iff the feature has a name.
   bool m_hasName = false;
+
+  // We may want to show results which did not pass filter.
+  bool m_refusedByFilter = false;
 };
 
 ResultType GetResultType(feature::TypesHolder const & th);

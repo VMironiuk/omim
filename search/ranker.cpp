@@ -35,16 +35,17 @@ namespace search
 namespace
 {
 template <typename Slice>
-void UpdateNameScores(string const & name, Slice const & slice, NameScores & bestScores)
+void UpdateNameScores(string const & name, uint8_t lang, Slice const & slice,
+                      NameScores & bestScores)
 {
-  bestScores.UpdateIfBetter(GetNameScores(name, slice));
+  bestScores.UpdateIfBetter(GetNameScores(name, lang, slice));
 }
 
 template <typename Slice>
-void UpdateNameScores(vector<strings::UniString> const & tokens, Slice const & slice,
+void UpdateNameScores(vector<strings::UniString> const & tokens, uint8_t lang, Slice const & slice,
                       NameScores & bestScores)
 {
-  bestScores.UpdateIfBetter(GetNameScores(tokens, slice));
+  bestScores.UpdateIfBetter(GetNameScores(tokens, lang, slice));
 }
 
 // This function supports only street names like "abcdstrasse"/"abcd strasse".
@@ -109,68 +110,69 @@ pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const 
     vector<strings::UniString> tokens;
     PrepareStringForMatching(name, tokens);
 
-    UpdateNameScores(tokens, slice, bestScores);
-    UpdateNameScores(tokens, sliceNoCategories, bestScores);
+    UpdateNameScores(tokens, lang, slice, bestScores);
+    UpdateNameScores(tokens, lang, sliceNoCategories, bestScores);
 
     if (type == Model::TYPE_STREET)
     {
       auto const variants = ModifyStrasse(tokens);
       for (auto const & variant : variants)
       {
-        UpdateNameScores(variant, slice, bestScores);
-        UpdateNameScores(variant, sliceNoCategories, bestScores);
+        UpdateNameScores(variant, lang, slice, bestScores);
+        UpdateNameScores(variant, lang, sliceNoCategories, bestScores);
       }
     }
   }
 
   if (type == Model::TYPE_BUILDING)
-    UpdateNameScores(ft.GetHouseNumber(), sliceNoCategories, bestScores);
+    UpdateNameScores(ft.GetHouseNumber(), StringUtf8Multilang::kDefaultCode, sliceNoCategories,
+                     bestScores);
 
   if (ftypes::IsAirportChecker::Instance()(ft))
   {
     string const iata = ft.GetMetadata().Get(feature::Metadata::FMD_AIRPORT_IATA);
     if (!iata.empty())
-      UpdateNameScores(iata, sliceNoCategories, bestScores);
+      UpdateNameScores(iata, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
   }
 
   string const op = ft.GetMetadata().Get(feature::Metadata::FMD_OPERATOR);
   if (!op.empty())
-    UpdateNameScores(op, sliceNoCategories, bestScores);
+    UpdateNameScores(op, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
 
   string const brand = ft.GetMetadata().Get(feature::Metadata::FMD_BRAND);
   if (!brand.empty())
   {
     auto const & brands = indexer::GetDefaultBrands();
     brands.ForEachNameByKey(brand, [&](indexer::BrandsHolder::Brand::Name const & name) {
-      UpdateNameScores(name.m_name, sliceNoCategories, bestScores);
+      UpdateNameScores(name.m_name, name.m_locale, sliceNoCategories, bestScores);
     });
   }
 
   if (type == Model::TYPE_STREET)
   {
     for (auto const & shield : feature::GetRoadShieldsNames(ft.GetRoadNumber()))
-      UpdateNameScores(shield, sliceNoCategories, bestScores);
+      UpdateNameScores(shield, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
   }
 
   return make_pair(bestScores, matchedLength);
 }
 
-pair<ErrorsMade, size_t> MatchTokenRange(FeatureType & ft, Geocoder::Params const & params,
-                                         TokenRange const & range, Model::Type type)
+void MatchTokenRange(FeatureType & ft, Geocoder::Params const & params, TokenRange const & range,
+                     Model::Type type, ErrorsMade & errorsMade, size_t & matchedLength,
+                     bool & isAltOrOldName)
 {
   auto const scores = GetNameScores(ft, params, range, type);
-  auto errorsMade = scores.first.m_errorsMade;
-  auto matchedLength = scores.second;
+  errorsMade = scores.first.m_errorsMade;
+  isAltOrOldName = scores.first.m_isAltOrOldName;
+  matchedLength = scores.second;
   if (errorsMade.IsValid())
-    return make_pair(errorsMade, matchedLength);
+    return;
 
   for (auto const token : range)
   {
     errorsMade += ErrorsMade{GetMaxErrorsForToken(params.GetToken(token).GetOriginal())};
     matchedLength += params.GetToken(token).GetOriginal().size();
   }
-
-  return make_pair(errorsMade, matchedLength);
 }
 
 void RemoveDuplicatingLinear(vector<RankerResult> & results)
@@ -354,13 +356,14 @@ class RankerResultMaker
     info.m_popularity = preInfo.m_popularity;
     info.m_rating = preInfo.m_rating;
     info.m_type = preInfo.m_type;
-    if (info.m_type == Model::TYPE_POI)
+    if (Model::IsPoi(info.m_type))
       info.m_resultType = GetResultType(feature::TypesHolder(ft));
     info.m_allTokensUsed = preInfo.m_allTokensUsed;
     info.m_numTokens = m_params.GetNumTokens();
     info.m_exactMatch = preInfo.m_exactMatch;
     info.m_categorialRequest = m_params.IsCategorialRequest();
     info.m_tokenRanges = preInfo.m_tokenRanges;
+    info.m_refusedByFilter = preInfo.m_refusedByFilter;
 
     // We do not compare result name and request for categorial requests but we prefer named
     // features.
@@ -380,6 +383,7 @@ class RankerResultMaker
 
       auto nameScore = scores.first.m_nameScore;
       auto errorsMade = scores.first.m_errorsMade;
+      bool isAltOrOldName = scores.first.m_isAltOrOldName;
       auto matchedLength = scores.second;
 
       if (info.m_type != Model::TYPE_STREET &&
@@ -395,6 +399,8 @@ class RankerResultMaker
 
           nameScore = min(nameScore, streetScores.first.m_nameScore);
           errorsMade += streetScores.first.m_errorsMade;
+          if (streetScores.first.m_isAltOrOldName)
+            isAltOrOldName = true;
           matchedLength += streetScores.second;
         }
       }
@@ -408,9 +414,15 @@ class RankerResultMaker
         {
           auto const type = Model::TYPE_SUBURB;
           auto const & range = preInfo.m_tokenRanges[type];
-          auto const matchingResult = MatchTokenRange(*suburb, m_params, range, type);
-          errorsMade += matchingResult.first;
-          matchedLength += matchingResult.second;
+          ErrorsMade suburbErrors;
+          size_t suburbMatchedLength = 0;
+          bool suburbNameIsAltNameOrOldName = false;
+          MatchTokenRange(*suburb, m_params, range, type, suburbErrors, suburbMatchedLength,
+                          suburbNameIsAltNameOrOldName);
+          errorsMade += suburbErrors;
+          matchedLength += suburbMatchedLength;
+          if (suburbNameIsAltNameOrOldName)
+            isAltOrOldName = true;
         }
       }
 
@@ -421,9 +433,15 @@ class RankerResultMaker
         {
           auto const type = Model::TYPE_CITY;
           auto const & range = preInfo.m_tokenRanges[type];
-          auto const matchingResult = MatchTokenRange(*city, m_params, range, type);
-          errorsMade += matchingResult.first;
-          matchedLength += matchingResult.second;
+          ErrorsMade cityErrors;
+          size_t cityMatchedLength = 0;
+          bool cityNameIsAltNameOrOldName = false;
+          MatchTokenRange(*city, m_params, range, type, cityErrors, cityMatchedLength,
+                          cityNameIsAltNameOrOldName);
+          errorsMade += cityErrors;
+          matchedLength += cityMatchedLength;
+          if (cityNameIsAltNameOrOldName)
+            isAltOrOldName = true;
         }
       }
 
@@ -433,6 +451,7 @@ class RankerResultMaker
 
       info.m_nameScore = nameScore;
       info.m_errorsMade = errorsMade;
+      info.m_isAltOrOldName = isAltOrOldName;
       info.m_matchedFraction =
           totalLength == 0 ? 1.0
                            : static_cast<double>(matchedLength) / static_cast<double>(totalLength);
@@ -738,6 +757,7 @@ void Ranker::MakeRankerResults(Geocoder::Params const & geocoderParams,
 
 void Ranker::GetBestMatchName(FeatureType & f, string & name) const
 {
+  int8_t bestLang = StringUtf8Multilang::kUnsupportedLanguageCode;
   KeywordLangMatcher::Score bestScore;
   auto updateScore = [&](int8_t lang, string const & s, bool force) {
     // Ignore name for categorial requests.
@@ -746,6 +766,7 @@ void Ranker::GetBestMatchName(FeatureType & f, string & name) const
     {
       bestScore = score;
       name = s;
+      bestLang = lang;
     }
   };
 
@@ -762,6 +783,16 @@ void Ranker::GetBestMatchName(FeatureType & f, string & name) const
     }
   };
   UNUSED_VALUE(f.ForEachName(bestNameFinder));
+
+  if (bestLang == StringUtf8Multilang::kAltNameCode ||
+      bestLang == StringUtf8Multilang::kOldNameCode)
+  {
+    string readableName;
+    f.GetReadableName(readableName);
+    // Do nothing if alt/old name is the only name we have.
+    if (readableName != name)
+      name = readableName + " (" + name + ")";
+  }
 }
 
 void Ranker::MatchForSuggestions(strings::UniString const & token, int8_t locale,

@@ -3,7 +3,6 @@
 
 @interface MWMEditorAdditionalNamesTableViewController ()
 
-@property (nonatomic) NSInteger selectedLanguageCode;
 @property (weak, nonatomic) id<MWMEditorAdditionalNamesProtocol> delegate;
 
 @end
@@ -20,12 +19,10 @@
 - (void)configWithDelegate:(id<MWMEditorAdditionalNamesProtocol>)delegate
                       name:(StringUtf8Multilang const &)name
 additionalSkipLanguageCodes:(std::vector<NSInteger>)additionalSkipLanguageCodes
-      selectedLanguageCode:(NSInteger)selectedLanguageCode
 {
   self.delegate = delegate;
   m_name = name;
   m_additionalSkipLanguageCodes = additionalSkipLanguageCodes;
-  self.selectedLanguageCode = selectedLanguageCode;
 }
 
 - (void)viewDidLoad
@@ -40,17 +37,12 @@ additionalSkipLanguageCodes:(std::vector<NSInteger>)additionalSkipLanguageCodes
   auto const getIndex = [](std::string const & lang) { return StringUtf8Multilang::GetLangIndex(lang); };
   StringUtf8Multilang::Languages const & supportedLanguages = StringUtf8Multilang::GetSupportedLanguages();
   m_languages.clear();
-  if (self.selectedLanguageCode == StringUtf8Multilang::kDefaultCode ||
-      self.selectedLanguageCode == StringUtf8Multilang::kInternationalCode)
-  {
-    return;
-  }
 
   auto constexpr kDefaultCode = StringUtf8Multilang::kDefaultCode;
   for (auto const & language : supportedLanguages)
   {
     auto const langIndex = getIndex(language.m_code);
-    if (self.selectedLanguageCode == NSNotFound && langIndex != kDefaultCode && m_name.HasString(langIndex))
+    if (langIndex != kDefaultCode && m_name.HasString(langIndex))
       continue;
     auto it = std::find(m_additionalSkipLanguageCodes.begin(), m_additionalSkipLanguageCodes.end(), langIndex);
     if (it == m_additionalSkipLanguageCodes.end())
@@ -74,11 +66,11 @@ additionalSkipLanguageCodes:(std::vector<NSInteger>)additionalSkipLanguageCodes
   MWMTableViewCell * cell = [tableView dequeueReusableCellWithIdentifier:@"ListCellIdentifier"];
   NSInteger const index = indexPath.row;
   StringUtf8Multilang::Lang const & language = m_languages[index];
-  cell.textLabel.text = @(language.m_name);
-  cell.detailTextLabel.text = @(language.m_code);
+  cell.textLabel.text = @(language.m_name.c_str());
+  cell.detailTextLabel.text = @(language.m_code.c_str());
 
   int8_t const languageIndex = StringUtf8Multilang::GetLangIndex(language.m_code);
-  cell.accessoryType = (languageIndex == self.selectedLanguageCode ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone);
+  cell.accessoryType = UITableViewCellAccessoryNone;
   return cell;
 }
 

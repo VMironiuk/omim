@@ -1787,8 +1787,10 @@
 	<string name="connection_error_dialog_guides_try">Opnieuw proberen</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Uitzetten</string>
 	<string name="connection_error_toast_guides">Opnieuw proberen verbinding te maken</string>
-	<string name="routes_card_show">Tonen</string>
-	<string name="routes_card_hide">Verbergen</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Tonen op kaart</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">Verbergen op kaart</string>
 	<string name="whatsnew_catalog_new_title">Nieuwe reisgidscatalogus en duizenden reisideeën</string>
 	<string name="whatsnew_catalog_new_message">We hebben de reisgidscatalogus bijgewerkt en vertalingen in alle talen toegevoegd. Begin vooruit te plannen!</string>
 	<string name="whatsnew_elevation_profile_title">Hoogteprofiel in reisgidsen</string>
@@ -1878,6 +1880,15 @@
 	<string name="type.amenity.pub">Kroeg</string>
 	<string name="type.amenity.public_bookcase">Boekenkast</string>
 	<string name="type.amenity.recycling">Milieustraat</string>
+	<string name="type.amenity.recycling_container">Recycling container</string>
+	<string name="type.recycling.toxic">Giftig afval</string>
+	<string name="type.recycling.clothes">Oude kleding</string>
+	<string name="type.recycling.glass_bottles">Glazen flessen</string>
+	<string name="type.recycling.paper">Papierafval</string>
+	<string name="type.recycling.plastic">Plastic afval</string>
+	<string name="type.recycling.plastic_bottles">Plastic flessen</string>
+	<string name="type.recycling.scrap_metal">Schroot</string>
+	<string name="type.recycling.small_appliances">Elektronisch afval</string>
 	<string name="type.amenity.shelter">Beschutting</string>
 	<string name="type.amenity.shower">Douche</string>
 	<string name="type.amenity.telephone">Telefoon</string>
@@ -2017,6 +2028,7 @@
 	<string name="type.highway.footway.mountain_hiking">Pad</string>
 	<string name="type.highway.footway.permissive">Pad</string>
 	<string name="type.highway.footway.tunnel">Pad</string>
+	<string name="type.highway.ford">Voorde</string>
 	<string name="type.highway.living_street">Straat</string>
 	<string name="type.highway.living_street.bridge">Straat</string>
 	<string name="type.highway.living_street.tunnel">Straat</string>

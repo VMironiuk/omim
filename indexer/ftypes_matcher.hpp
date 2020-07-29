@@ -136,11 +136,33 @@ public:
   DECLARE_CHECKER_INSTANCE(IsSquareChecker);
 };
 
+// Type of suburb.
+// Do not change values and order - they are in the order of decreasing specificity.
+// Suburb > Neighbourhood > Residential
+enum class SuburbType
+{
+  None = -1,
+  Residential = 0,
+  Neighbourhood,
+  Suburb,
+  Count
+};
+
+static_assert(base::Underlying(SuburbType::Residential) <
+                  base::Underlying(SuburbType::Neighbourhood),
+              "");
+static_assert(base::Underlying(SuburbType::Neighbourhood) < base::Underlying(SuburbType::Suburb),
+              "");
+
 class IsSuburbChecker : public BaseChecker
 {
   IsSuburbChecker();
 
 public:
+  SuburbType GetType(uint32_t t) const;
+  SuburbType GetType(feature::TypesHolder const & types) const;
+  SuburbType GetType(FeatureType & f) const;
+
   DECLARE_CHECKER_INSTANCE(IsSuburbChecker);
 };
 

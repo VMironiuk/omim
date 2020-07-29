@@ -40,7 +40,7 @@ NameScores GetScore(string const & name, string const & query, TokenRange const 
     params.InitNoPrefix(tokens.begin(), tokens.end());
   }
 
-  return GetNameScores(name, TokenSlice(params, tokenRange));
+  return GetNameScores(name, StringUtf8Multilang::kDefaultCode, TokenSlice(params, tokenRange));
 }
 
 UNIT_TEST(NameTest_Smoke)
@@ -49,7 +49,8 @@ UNIT_TEST(NameTest_Smoke)
                        NameScore nameScore, size_t errorsMade) {
     TEST_EQUAL(
         GetScore(name, query, tokenRange),
-        NameScores(nameScore, nameScore == NAME_SCORE_ZERO ? ErrorsMade() : ErrorsMade(errorsMade)),
+        NameScores(nameScore, nameScore == NAME_SCORE_ZERO ? ErrorsMade() : ErrorsMade(errorsMade),
+                   false /* isAltOrOldNAme */),
         (name, query, tokenRange));
   };
 
@@ -82,9 +83,9 @@ UNIT_TEST(PreferCountry)
 
   auto cafe = info;
   cafe.m_distanceToPivot = 1e3;
-  cafe.m_tokenRanges[Model::TYPE_POI] = TokenRange(0, 1);
+  cafe.m_tokenRanges[Model::TYPE_SUBPOI] = TokenRange(0, 1);
   cafe.m_exactCountryOrCapital = false;
-  cafe.m_type = Model::TYPE_POI;
+  cafe.m_type = Model::TYPE_SUBPOI;
 
   auto country = info;
   country.m_distanceToPivot = 1e6;

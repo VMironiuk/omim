@@ -4,9 +4,9 @@
 #import "MWMNoMapsViewController.h"
 #import "MWMRoutePoint+CPP.h"
 #import "MWMRouter.h"
-#import "MWMSearchChangeModeView.h"
 #import "MWMSearchManager+Filter.h"
 #import "MWMSearchManager+Layout.h"
+#import "MWMSearchTableViewController.h"
 #import "MapViewController.h"
 #import "Statistics.h"
 #import "SwiftBridge.h"
@@ -32,28 +32,23 @@ using Observers = NSHashTable<Observer>;
                                 MWMSearchTabViewControllerDelegate,
                                 UITextFieldDelegate,
                                 MWMStorageObserver,
-                                MWMSearchObserver>
+                                MWMSearchObserver,
+                                DatePickerViewControllerDelegate,
+                                GuestsPickerViewControllerDelegate>
 
 @property(weak, nonatomic, readonly) UIViewController *ownerController;
 @property(weak, nonatomic, readonly) UIView *searchViewContainer;
 @property(weak, nonatomic, readonly) UIView *actionBarContainer;
+@property(weak, nonatomic, readonly) MWMMapViewControlsManager *controlsManager;
 
 @property(nonatomic) IBOutlet SearchBar *searchBarView;
-
-@property(nonatomic) IBOutlet UIView *actionBarView;
-
-@property(weak, nonatomic) IBOutlet NSLayoutConstraint *actionBarViewHeight;
-@property(nonatomic) MWMSearchManagerActionBarState actionBarState;
-@property(weak, nonatomic) IBOutlet UIButton *actionBarViewFilterButton;
-@property(nonatomic) IBOutlet UIView *tabBarView;
-@property(weak, nonatomic) IBOutlet NSLayoutConstraint *tabBarViewHeight;
-@property(nonatomic) IBOutlet MWMSearchChangeModeView *changeModeView;
-@property(weak, nonatomic) IBOutlet NSLayoutConstraint *changeModeViewHeight;
-@property(weak, nonatomic) IBOutlet UIButton *filterButton;
-
+@property(weak, nonatomic) IBOutlet SearchActionBarView *actionBarView;
 @property(nonatomic) IBOutlet UIView *contentView;
+@property(strong, nonatomic) IBOutlet UIView *tableViewContainer;
 
-@property(nonatomic) NSLayoutConstraint *actionBarViewBottom;
+@property(nonatomic) NSLayoutConstraint *contentViewTopHidden;
+@property(nonatomic) NSLayoutConstraint *actionBarViewBottomKeyboard;
+@property(nonatomic) NSLayoutConstraint *actionBarViewBottomNormal;
 
 @property(nonatomic) UINavigationController *navigationController;
 @property(nonatomic) MWMSearchTableViewController *tableViewController;
@@ -123,11 +118,30 @@ using Observers = NSHashTable<Observer>;
     statFrom = kStatSearchMapSearch;
   }
   if (GetFramework().HasPlacePageInfo()) {
-    [Statistics logEvent:kStatBackClick withParameters:@{kStatFrom: statFrom, kStatTo: kStatSearchResults, kStatPlacePage: kStatPreview}];
+    [Statistics logEvent:kStatBackClick
+          withParameters:@{kStatFrom: statFrom, kStatTo: kStatSearchResults, kStatPlacePage: kStatPreview}];
   } else {
     [Statistics logEvent:kStatBackClick withParameters:@{kStatFrom: statFrom, kStatTo: kStatSearchResults}];
   }
   self.state = MWMSearchManagerStateTableSearch;
+}
+
+- (IBAction)onBookingDateButtonPressed:(id)sender {
+  [self.searchTextField resignFirstResponder];
+  DatePickerViewController *controller = [[DatePickerViewController alloc] init];
+  controller.delegate = self;
+  controller.popoverPresentationController.sourceView = self.searchBarView;
+  controller.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionUp;
+  [[MapViewController sharedController] presentViewController:controller animated:YES completion:nil];
+}
+
+- (IBAction)onBookingGuestsButtonPressed:(id)sender {
+  [self.searchTextField resignFirstResponder];
+  GuestsPickerViewController *controller = [[GuestsPickerViewController alloc] init];
+  controller.delegate = self;
+  controller.popoverPresentationController.sourceView = self.searchBarView;
+  controller.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionUp;
+  [[MapViewController sharedController] presentViewController:controller animated:YES completion:nil];
 }
 
 #pragma mark - Layout
@@ -214,29 +228,38 @@ using Observers = NSHashTable<Observer>;
   self.routingTooltipSearch = MWMSearchManagerRoutingTooltipSearchNone;
   [self endSearch];
 
+  MWMMapViewControlsManager *controlsManager = self.controlsManager;
+  controlsManager.menuState = controlsManager.menuRestoreState;
   [self viewHidden:YES];
 }
 
 - (void)changeToDefaultState {
+  MWMMapViewControlsManager *controlsManager = self.controlsManager;
+
   [self.navigationController popToRootViewControllerAnimated:NO];
 
   self.searchBarView.state = SearchBarStateReady;
   GetFramework().DeactivateMapSelection(true);
   [self animateConstraints:^{
-    self.actionBarViewBottom.priority = UILayoutPriorityDefaultLow;
+    self.contentViewTopHidden.priority = UILayoutPriorityDefaultLow;
   }];
+  controlsManager.menuState = controlsManager.menuRestoreState;
   [self viewHidden:NO];
+  self.searchBarView.isBookingSearchViewHidden = ![MWMSearch isHotelResults];
   self.actionBarState = MWMSearchManagerActionBarStateHidden;
   [self.searchTextField becomeFirstResponder];
   [self.searchBarView applyTheme];
 }
 
 - (void)changeToTableSearchState {
+  MWMMapViewControlsManager *controlsManager = self.controlsManager;
+
   [self.navigationController popToRootViewControllerAnimated:NO];
 
   self.searchBarView.state = SearchBarStateReady;
   GetFramework().DeactivateMapSelection(true);
   [self updateTableSearchActionBar];
+  controlsManager.menuState = controlsManager.menuRestoreState;
   [self viewHidden:NO];
   [MWMSearch setSearchOnMap:NO];
   [self.tableViewController reloadData];
@@ -252,11 +275,12 @@ using Observers = NSHashTable<Observer>;
   self.actionBarState = MWMSearchManagerActionBarStateModeFilter;
   if (!IPAD) {
     [self animateConstraints:^{
-      self.actionBarViewBottom.priority = UILayoutPriorityDefaultHigh;
+      self.contentViewTopHidden.priority = UILayoutPriorityDefaultHigh;
     }];
   }
   auto const navigationManagerState = [MWMNavigationDashboardManager sharedManager].state;
   [self viewHidden:navigationManagerState != MWMNavigationDashboardStateHidden];
+  self.controlsManager.menuState = MWMBottomMenuStateHidden;
   [MWMSearch setSearchOnMap:YES];
   [self.tableViewController reloadData];
 
@@ -275,7 +299,7 @@ using Observers = NSHashTable<Observer>;
   self.actionBarState = MWMSearchManagerActionBarStateModeFilter;
   if (!IPAD) {
     [self animateConstraints:^{
-      self.actionBarViewBottom.priority = UILayoutPriorityDefaultHigh;
+      self.contentViewTopHidden.priority = UILayoutPriorityDefaultHigh;
     }];
   }
   auto const navigationManagerState = [MWMNavigationDashboardManager sharedManager].state;
@@ -307,6 +331,10 @@ using Observers = NSHashTable<Observer>;
   } else {
     self.searchBarView.state = SearchBarStateReady;
   }
+
+  self.searchBarView.isBookingSearchViewHidden = !([MWMSearch isHotelResults] || [MWMSearch hasAvailability]);
+  [self.actionBarView updateFilterButtonWithShowFilter:[MWMSearch isHotelResults] || [MWMSearch hasFilter]
+                                           filterCount:[MWMSearch filterCount]];
   if (self.state != MWMSearchManagerStateTableSearch)
     return;
   [self.tableViewController onSearchCompleted];
@@ -315,6 +343,9 @@ using Observers = NSHashTable<Observer>;
 
 - (void)onSearchStarted {
   self.searchBarView.state = SearchBarStateSearching;
+  self.searchBarView.isBookingSearchViewHidden = !([MWMSearch isHotelResults] || [MWMSearch hasAvailability]);
+  [self.actionBarView updateFilterButtonWithShowFilter:[MWMSearch isHotelResults] || [MWMSearch hasFilter]
+                                           filterCount:[MWMSearch filterCount]];
   if (self.state != MWMSearchManagerStateTableSearch)
     return;
   self.actionBarState = MWMSearchManagerActionBarStateModeFilter;
@@ -338,7 +369,7 @@ using Observers = NSHashTable<Observer>;
     self.actionBarState =
       hideActionBar ? MWMSearchManagerActionBarStateHidden : MWMSearchManagerActionBarStateModeFilter;
 
-    self.actionBarViewBottom.priority = UILayoutPriorityDefaultLow;
+    self.contentViewTopHidden.priority = UILayoutPriorityDefaultLow;
   }];
 }
 
@@ -357,6 +388,50 @@ using Observers = NSHashTable<Observer>;
 - (void)onSearchManagerStateChanged {
   for (Observer observer in self.observers)
     [observer onSearchManagerStateChanged];
+}
+
+#pragma mark - DatePickerViewControllerDelegate
+
+- (void)datePicker:(DatePickerViewController *)datePicker
+didSelectStartDate:(NSDate *)startDate
+           endDate:(NSDate *)endDate {
+  [self.searchBarView setDatesWithCheckin:startDate checkout:endDate];
+  MWMHotelParams *filter = [MWMSearch getFilter];
+  if (!filter) {
+    filter = [MWMHotelParams new];
+  }
+  filter.checkInDate = startDate;
+  filter.checkOutDate = endDate;
+  [MWMSearch updateHotelFilterWithParams:filter];
+  [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)datePickerDidCancel:(DatePickerViewController *)datePicker {
+  [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
+}
+
+#pragma mark - GuestsPickerViewControllerDelegate
+
+- (void)guestsPicker:(GuestsPickerViewController *)guestsPicker
+      didSelectRooms:(NSInteger)rooms
+              adults:(NSInteger)adults
+            children:(NSInteger)children
+             infants:(NSInteger)infants {
+  [self.searchBarView setGuestCount:adults + children + infants];
+  MWMHotelParams *filter = [MWMSearch getFilter];
+  if (!filter) {
+    filter = [MWMHotelParams new];
+  }
+  filter.numberOfRooms = rooms;
+  filter.numberOfAdults = adults;
+  filter.numberOfChildren = children;
+  filter.numberOfInfants = infants;
+  [MWMSearch updateHotelFilterWithParams:filter];
+  [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)guestsPickerDidCancel:(GuestsPickerViewController *)guestsPicker {
+  [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
 }
 
 #pragma mark - Filters
@@ -449,7 +524,7 @@ using Observers = NSHashTable<Observer>;
       break;
   }
   [self onSearchManagerStateChanged];
-  [self.changeModeView updateForState:state];
+  [self.actionBarView updateForState:state];
   [[MapViewController sharedController] updateStatusBarStyle];
 }
 
@@ -458,18 +533,17 @@ using Observers = NSHashTable<Observer>;
   UIView *actionBarView = self.actionBarView;
   UIView *contentView = self.contentView;
   UIView *parentView = self.searchViewContainer;
-  UIView *actionBarContaner = self.actionBarContainer;
 
   if (!hidden) {
     if (searchBarView.superview) {
       [parentView bringSubviewToFront:searchBarView];
-      [actionBarContaner bringSubviewToFront:actionBarView];
       [parentView bringSubviewToFront:contentView];
+      [parentView bringSubviewToFront:actionBarView];
       return;
     }
     [parentView addSubview:searchBarView];
-    [actionBarContaner addSubview:actionBarView];
     [parentView addSubview:contentView];
+    [parentView addSubview:actionBarView];
     [self layoutTopViews];
   }
   [UIView animateWithDuration:kDefaultAnimationDuration
@@ -488,34 +562,16 @@ using Observers = NSHashTable<Observer>;
     }];
 }
 
-- (void)setChangeModeView:(MWMSearchChangeModeView *)changeModeView {
-  _changeModeView = changeModeView;
-  [changeModeView updateForState:self.state];
-}
-
 - (void)setActionBarState:(MWMSearchManagerActionBarState)actionBarState {
-  _actionBarState = actionBarState;
   switch (actionBarState) {
     case MWMSearchManagerActionBarStateHidden:
-      self.tabBarView.hidden = YES;
-      self.changeModeView.hidden = YES;
-      self.actionBarViewHeight.priority = UILayoutPriorityDefaultHigh;
-      self.tabBarViewHeight.priority = UILayoutPriorityDefaultLow;
-      self.changeModeViewHeight.priority = UILayoutPriorityDefaultLow;
+      self.actionBarView.hidden = YES;
       break;
     case MWMSearchManagerActionBarStateTabBar:
-      self.tabBarView.hidden = NO;
-      self.changeModeView.hidden = YES;
-      self.actionBarViewHeight.priority = UILayoutPriorityDefaultLow;
-      self.tabBarViewHeight.priority = UILayoutPriorityDefaultHigh;
-      self.changeModeViewHeight.priority = UILayoutPriorityDefaultLow;
+      self.actionBarView.hidden = YES;
       break;
     case MWMSearchManagerActionBarStateModeFilter:
-      self.tabBarView.hidden = YES;
-      self.changeModeView.hidden = NO;
-      self.actionBarViewHeight.priority = UILayoutPriorityDefaultLow;
-      self.tabBarViewHeight.priority = UILayoutPriorityDefaultLow;
-      self.changeModeViewHeight.priority = UILayoutPriorityDefaultHigh;
+      self.actionBarView.hidden = NO;
       break;
   }
 }
@@ -528,5 +584,9 @@ using Observers = NSHashTable<Observer>;
 }
 - (UIView *)actionBarContainer {
   return [MapViewController sharedController].controlsView;
+}
+
+- (MWMMapViewControlsManager *)controlsManager {
+  return [MWMMapViewControlsManager manager];
 }
 @end

@@ -16,11 +16,11 @@
 #include "base/task_loop.hpp"
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_set>
-#include <vector>
 
 class GuidesManager final
 {
@@ -78,7 +78,7 @@ public:
       OutdoorParams m_outdoorsParams;
     };
 
-    std::vector<Item> m_items;
+    std::deque<Item> m_items;
   };
 
   using CloseGalleryFn = std::function<void()>;
@@ -90,7 +90,6 @@ public:
   void SetStateListener(GuidesStateChangedFn const & onStateChangedFn);
 
   void UpdateViewport(ScreenBase const & screen);
-  void Invalidate();
   void Reconnect();
 
   void SetEnabled(bool enabled);
@@ -99,6 +98,7 @@ public:
   GuidesGallery GetGallery() const;
   std::string GetActiveGuide() const;
   void SetActiveGuide(std::string const & guideId);
+  void ResetActiveGuide();
 
   uint64_t GetShownGuidesCount() const;
 
@@ -113,18 +113,27 @@ public:
   void OnClusterSelected(GuidesClusterMark const & mark, ScreenBase const & screen);
   void OnGuideSelected();
 
+  void LogGuideSelectedStatistic();
+
 private:
-  void ChangeState(GuidesState newState);
+  void ChangeState(GuidesState newState, bool force = false);
   void RequestGuides(bool suggestZoom = false);
   void Clear();
 
   bool IsGuideDownloaded(std::string const & guideId) const;
+  void UpdateDownloadedStatus();
   void UpdateGuidesMarks();
   void UpdateActiveGuide();
 
   bool IsRequestParamsInitialized() const;
 
   void TrackStatistics() const;
+
+  GuidesGallery::Item MakeGalleryItem(guides_on_map::GuidesNode const & guide) const;
+
+  void OnRequestSucceed(guides_on_map::GuidesOnMap const & guides, bool suggestZoom,
+                        uint64_t requestNumber);
+  void OnRequestError();
 
   CloseGalleryFn m_closeGallery;
 
@@ -138,6 +147,7 @@ private:
 
   uint64_t m_requestCounter = 0;
   uint8_t m_errorRequestsCount = 0;
+  base::TaskLoop::TaskId m_retryAfterErrorRequestId = base::TaskLoop::kIncorrectId;
   base::TaskLoop::TaskId m_previousRequestsId = base::TaskLoop::kIncorrectId;
 
   guides_on_map::Api m_api;
@@ -146,8 +156,6 @@ private:
 
   BookmarkManager * m_bmManager = nullptr;
   df::DrapeEngineSafePtr m_drapeEngine;
-
-  uint32_t m_nextMarkIndex = 0;
 
   std::unordered_set<std::string> m_shownGuides;
   LayersStatistics m_statistics;

@@ -3,7 +3,7 @@ final class PendingTransactionsHandler: IPendingTransactionsHandler {
   private let pendingTransaction: IBillingPendingTransaction
 
   init(validation: IMWMPurchaseValidation, pendingTransaction: IBillingPendingTransaction) {
-    self.purchaseValidation = validation
+    purchaseValidation = validation
     self.pendingTransaction = pendingTransaction
   }
 
@@ -11,10 +11,9 @@ final class PendingTransactionsHandler: IPendingTransactionsHandler {
     switch pendingTransaction.status {
     case .none:
       completion(.none)
-      break
     case .paid:
-      purchaseValidation.validateReceipt("") { [weak self] in
-        switch $0 {
+      purchaseValidation.validateReceipt("") { [weak self] result, _ in
+        switch result {
         case .valid, .notValid, .noReceipt:
           completion(.success)
           self?.pendingTransaction.finishTransaction()
@@ -24,13 +23,10 @@ final class PendingTransactionsHandler: IPendingTransactionsHandler {
           completion(.needAuth)
         }
       }
-      break
     case .failed:
       pendingTransaction.finishTransaction()
-      break
     case .error:
       completion(.error)
-      break
     }
   }
 }

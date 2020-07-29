@@ -30,9 +30,10 @@ namespace search
 {
 namespace
 {
-void SweepNearbyResults(double eps, set<FeatureID> const & prevEmit, vector<PreRankerResult> & results)
+void SweepNearbyResults(double xEps, double yEps, set<FeatureID> const & prevEmit,
+                        vector<PreRankerResult> & results)
 {
-  m2::NearbyPointsSweeper sweeper(eps);
+  m2::NearbyPointsSweeper sweeper(xEps, yEps);
   for (size_t i = 0; i < results.size(); ++i)
   {
     auto const & p = results[i].GetInfo().m_center;
@@ -40,7 +41,10 @@ void SweepNearbyResults(double eps, set<FeatureID> const & prevEmit, vector<PreR
     uint8_t const popularity = results[i].GetInfo().m_popularity;
     uint8_t const prevCount = prevEmit.count(results[i].GetId()) ? 1 : 0;
     uint8_t const exactMatch = results[i].GetInfo().m_exactMatch ? 1 : 0;
-    uint8_t const priority = max({rank, prevCount, popularity, exactMatch});
+    // We prefer result which passed the filter even if it has lower rank / popularity / prevCount /
+    // exactMatch.
+    uint8_t const filterPassed = results[i].GetInfo().m_refusedByFilter ? 0 : 2;
+    uint8_t const priority = max({rank, prevCount, popularity, exactMatch}) + filterPassed;
     sweeper.Add(p.x, p.y, i, priority);
   }
 
@@ -282,7 +286,8 @@ void PreRanker::FilterForViewportSearch()
     return result.GetMatchedTokensNumber() + 1 < m_params.m_numQueryTokens;
   });
 
-  SweepNearbyResults(m_params.m_minDistanceOnMapBetweenResults, m_prevEmit, m_results);
+  SweepNearbyResults(m_params.m_minDistanceOnMapBetweenResultsX,
+                     m_params.m_minDistanceOnMapBetweenResultsY, m_prevEmit, m_results);
 
   size_t const n = m_results.size();
 

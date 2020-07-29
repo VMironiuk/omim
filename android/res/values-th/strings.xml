@@ -1791,8 +1791,10 @@
 	<string name="connection_error_dialog_guides_try">ลองอีกครั้ง</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">ปิดการทำงาน</string>
 	<string name="connection_error_toast_guides">ลองเชื่อมต่อใหม่</string>
-	<string name="routes_card_show">แสดง</string>
-	<string name="routes_card_hide">ซ่อน</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">แสดงบนแผนที่</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_hide">ซ่อนจากแผนที่</string>
 	<string name="whatsnew_catalog_new_title">ไกด์แคตตาล็อกใหม่และไอเดียในการท่องเที่ยวหลายพันอย่าง</string>
 	<string name="whatsnew_catalog_new_message">เราได้อัปเดตไกด์แคตตาล็อก และเพิ่มการแปลในทุกภาษา มาเริ่มวางแผนทริปของคุณล่วงหน้ากัน!</string>
 	<string name="whatsnew_elevation_profile_title">ข้อมูลของความสูงในคู่มือใช้งานเพื่อการท่องเที่ยว</string>
@@ -1886,6 +1888,15 @@
 	<string name="type.amenity.pub">ผับ</string>
 	<string name="type.amenity.public_bookcase">ตู้หนังสือ สถานที่แลกเปลี่ยนหนังสือ</string>
 	<string name="type.amenity.recycling">ศูนย์รีไซเคิล</string>
+	<string name="type.amenity.recycling_container">บรรจุภัณฑ์รีไซเคิล</string>
+	<string name="type.recycling.toxic">ขยะสารพิษ</string>
+	<string name="type.recycling.clothes">เสื้อผ้าเก่า</string>
+	<string name="type.recycling.glass_bottles">ขวดแก้ว</string>
+	<string name="type.recycling.paper">ขยะกระดาษ</string>
+	<string name="type.recycling.plastic">ขยะพลาสติก</string>
+	<string name="type.recycling.plastic_bottles">ขวดพลาสติก</string>
+	<string name="type.recycling.scrap_metal">โลหะมีคม</string>
+	<string name="type.recycling.small_appliances">ขยะอิเล็กทรอนิกส์</string>
 	<string name="type.amenity.restaurant">ร้านอาหาร</string>
 	<string name="type.amenity.school">โรงเรียน</string>
 	<string name="type.amenity.shelter">ที่อยู่อาศัย</string>
@@ -2031,6 +2042,7 @@
 	<string name="type.highway.footway.mountain_hiking">เส้นทาง</string>
 	<string name="type.highway.footway.permissive">เส้นทาง</string>
 	<string name="type.highway.footway.tunnel">เส้นทาง</string>
+	<string name="type.highway.ford">ที่ตื้นของทางน้ำ</string>
 	<string name="type.highway.living_street">ถนน</string>
 	<string name="type.highway.living_street.bridge">ถนน</string>
 	<string name="type.highway.living_street.tunnel">ถนน</string>

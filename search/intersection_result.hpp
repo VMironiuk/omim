@@ -16,7 +16,7 @@ struct IntersectionResult
 
   void Set(Model::Type type, uint32_t id);
 
-  // Returns the first valid feature among the [POI, BUILDING,
+  // Returns the first valid feature among the [SUBPOI, COMPLEX_POI, BUILDING,
   // STREET].
   uint32_t InnermostResult() const;
 
@@ -26,7 +26,8 @@ struct IntersectionResult
   // Clears all fields to an invalid state.
   void Clear();
 
-  uint32_t m_poi = kInvalidId;
+  uint32_t m_subpoi = kInvalidId;
+  uint32_t m_complexPoi = kInvalidId;
   uint32_t m_building = kInvalidId;
   uint32_t m_street = kInvalidId;
   uint32_t m_suburb = kInvalidId;

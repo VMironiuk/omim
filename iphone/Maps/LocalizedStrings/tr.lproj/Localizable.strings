@@ -3282,9 +3282,11 @@
 
 "connection_error_toast_guides" = "İnternete yeniden bağlanıyoruz";
 
-"routes_card_show" = "Göster";
+/* as few symbols as possible */
+"routes_card_show" = "Haritada göster";
 
-"routes_card_hide" = "Gizle";
+/* as few symbols as possible */
+"routes_card_hide" = "Haritadan gizle";
 
 "whatsnew_catalog_new_title" = "Yeni bir katalog ve binlerce tatil fikri";
 
@@ -3313,6 +3315,45 @@
 "routes_card_routes_tag" = "Yol";
 
 "routes_card_set_tag" = "Öne çıkan yerler";
+
+/* FIXME */
+"guides_trial_cta_button" = "guides_trial_cta_button";
+
+/* FIXME */
+"guides_trial_message" = "guides_trial_message%s";
+
+/* FIXME */
+"trial_error_dialog" = "trial_error_dialog";
+
+/* FIXME */
+"floating_button_filters" = "Filters";
+
+/* FIXME */
+"date_picker_сhoose_dates_cta" = "Choose dates";
+
+/* FIXME */
+"guests_picker_rooms" = "Rooms";
+
+/* FIXME */
+"guests_picker_adults" = "Adults";
+
+/* FIXME */
+"guests_picker_children_title" = "Children";
+
+/* FIXME */
+"guests_picker_children_subtitle" = "3-16 y.o.";
+
+/* FIXME */
+"guests_picker_infants_title" = "Infants";
+
+/* FIXME */
+"guests_picker_infants_subtitle" = "0-3 y.o.";
+
+/* FIXME */
+"booking_map_component_availability" = "No rooms";
+
+/* FIXME */
+"booking_map_component_filters" = "Out of filters";
 
 
 /**********  Partners  **********/
@@ -3518,23 +3559,23 @@
 
 "type.amenity.recycling" = "Geri dönüşüm merkezi";
 
-"type.amenity.recycling_container" = "Recycling container";
+"type.amenity.recycling_container" = "Atık toplama merkezi";
 
-"type.recycling.toxic" = "Toxic waste";
+"type.recycling.toxic" = "Zehirli atık";
 
-"type.recycling.clothes" = "Old clothes";
+"type.recycling.clothes" = "Eski kıyafetler";
 
-"type.recycling.glass_bottles" = "Glass bottles";
+"type.recycling.glass_bottles" = "Cam şişeler";
 
-"type.recycling.paper" = "Paper waste";
+"type.recycling.paper" = "Kağıt atıkları";
 
-"type.recycling.plastic" = "Plastic waste";
+"type.recycling.plastic" = "Plastik atıklar";
 
-"type.recycling.plastic_bottles" = "Plastic bottles";
+"type.recycling.plastic_bottles" = "Plastik şişeler";
 
-"type.recycling.scrap_metal" = "Scrap metal";
+"type.recycling.scrap_metal" = "Metal hurdalar";
 
-"type.recycling.small_appliances" = "Electronic waste";
+"type.recycling.small_appliances" = "Elektronik atık";
 
 "type.amenity.restaurant" = "Restoran";
 
@@ -3908,7 +3949,7 @@
 
 "type.highway.footway.tunnel" = "Yol";
 
-"type.highway.ford" = "Ford";
+"type.highway.ford" = "Geçit";
 
 "type.highway.living_street" = "Cadde";
 
@@ -4131,6 +4172,8 @@
 "type.hwtag" = "hwtag";
 
 "type.hwtag.bidir_bicycle" = "hwtag-bidir_bicycle";
+
+"type.hwtag.onedir_bicycle" = "hwtag-onedir_bicycle";
 
 "type.hwtag.lit" = "hwtag-lit";
 
@@ -4446,27 +4489,27 @@
 
 "type.place.city" = "Şehir";
 
-"type.place.city.capital" = "Sermaye";
+"type.place.city.capital" = "Başkent";
 
-"type.place.city.capital.10" = "Sermaye";
+"type.place.city.capital.10" = "Başkent";
 
-"type.place.city.capital.11" = "Sermaye";
+"type.place.city.capital.11" = "Başkent";
 
-"type.place.city.capital.2" = "Sermaye";
+"type.place.city.capital.2" = "Başkent";
 
-"type.place.city.capital.3" = "Sermaye";
+"type.place.city.capital.3" = "Başkent";
 
-"type.place.city.capital.4" = "Sermaye";
+"type.place.city.capital.4" = "Başkent";
 
-"type.place.city.capital.5" = "Sermaye";
+"type.place.city.capital.5" = "Başkent";
 
-"type.place.city.capital.6" = "Sermaye";
+"type.place.city.capital.6" = "Başkent";
 
-"type.place.city.capital.7" = "Sermaye";
+"type.place.city.capital.7" = "Başkent";
 
-"type.place.city.capital.8" = "Sermaye";
+"type.place.city.capital.8" = "Başkent";
 
-"type.place.city.capital.9" = "Sermaye";
+"type.place.city.capital.9" = "Başkent";
 
 "type.place.continent" = "Kıta";
 

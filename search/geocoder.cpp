@@ -68,6 +68,8 @@ size_t constexpr kMaxNumCountries = 10;
 double constexpr kMaxViewportRadiusM = 50.0 * 1000;
 double constexpr kMaxPostcodeRadiusM = 1000;
 double constexpr kMaxSuburbRadiusM = 2000;
+double constexpr kMaxNeighbourhoodRadiusM = 500;
+double constexpr kMaxResidentialRadiusM = 500;
 
 size_t constexpr kPivotRectsCacheSize = 10;
 size_t constexpr kPostcodesRectsCacheSize = 10;
@@ -1228,8 +1230,17 @@ void Geocoder::GreedilyMatchStreetsWithSuburbs(BaseContext & ctx,
       vector<uint32_t> suburbFeatures = {ft->GetID().m_index};
       layer.m_sortedFeatures = &suburbFeatures;
 
-      auto const rect =
-          mercator::RectByCenterXYAndSizeInMeters(feature::GetCenter(*ft), kMaxSuburbRadiusM);
+      auto const suburbType = ftypes::IsSuburbChecker::Instance().GetType(*ft);
+      double radius = 0.0;
+      switch (suburbType)
+      {
+      case ftypes::SuburbType::Residential: radius = kMaxResidentialRadiusM; break;
+      case ftypes::SuburbType::Neighbourhood: radius = kMaxNeighbourhoodRadiusM; break;
+      case ftypes::SuburbType::Suburb: radius = kMaxSuburbRadiusM; break;
+      default: CHECK(false, ("Bad suburb type:", base::Underlying(suburbType)));
+      }
+
+      auto const rect = mercator::RectByCenterXYAndSizeInMeters(feature::GetCenter(*ft), radius);
       auto const suburbCBV = RetrieveGeometryFeatures(*m_context, rect, RectId::Suburb);
       auto const suburbStreets = ctx.m_streets.Intersect(suburbCBV);
 
@@ -1499,7 +1510,7 @@ bool Geocoder::IsLayerSequenceSane(vector<FeaturesLayer> const & layers) const
       buildingIndex = i;
     else if (layer.m_type == Model::TYPE_STREET)
       streetIndex = i;
-    else if (layer.m_type == Model::TYPE_POI)
+    else if (Model::IsPoi(layer.m_type))
       poiIndex = i;
   }
 
@@ -1551,8 +1562,10 @@ void Geocoder::FindPaths(BaseContext & ctx)
       auto const tokenType = context.m_tokens[i];
       auto id = IntersectionResult::kInvalidId;
 
-      if (tokenType == BaseContext::TokenType::TOKEN_TYPE_POI)
-        id = result.m_poi;
+      if (tokenType == BaseContext::TokenType::TOKEN_TYPE_SUBPOI)
+        id = result.m_subpoi;
+      if (tokenType == BaseContext::TokenType::TOKEN_TYPE_COMPLEX_POI)
+        id = result.m_complexPoi;
       if (tokenType == BaseContext::TokenType::TOKEN_TYPE_STREET)
         id = result.m_street;
 
@@ -1597,7 +1610,7 @@ void Geocoder::TraceResult(Tracer & tracer, BaseContext const & ctx, MwmSet::Mwm
 {
   SCOPE_GUARD(emitParse, [&]() { tracer.EmitParse(ctx.m_tokens); });
 
-  if (type != Model::TYPE_POI && type != Model::TYPE_BUILDING)
+  if (!Model::IsPoi(type) && type != Model::TYPE_BUILDING)
     return;
 
   if (mwmId != m_context->GetId())
@@ -1648,9 +1661,6 @@ void Geocoder::EmitResult(BaseContext & ctx, MwmSet::MwmId const & mwmId, uint32
   if (matchedFraction <= 0.1)
     return;
 
-  if (ctx.m_hotelsFilter && !ctx.m_hotelsFilter->Matches(id))
-    return;
-
   if (ctx.m_cuisineFilter && !ctx.m_cuisineFilter->Matches(id))
     return;
 
@@ -1663,6 +1673,10 @@ void Geocoder::EmitResult(BaseContext & ctx, MwmSet::MwmId const & mwmId, uint32
   // distant from the pivot when there are enough results close to the
   // pivot.
   PreRankingInfo info(type, tokenRange);
+
+  if (ctx.m_hotelsFilter && !ctx.m_hotelsFilter->Matches(id))
+    info.m_refusedByFilter = true;
+
   for (auto const & layer : ctx.m_layers)
     info.m_tokenRanges[layer.m_type] = layer.m_tokenRange;
 

@@ -20,6 +20,7 @@ omim_link_libraries(
   base
   jansson
   stats_client
+  opening_hours
   oauthcpp
   ${LIBZ}
 )

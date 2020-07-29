@@ -59,6 +59,7 @@ public:
   using KMLDataCollectionPtr = std::shared_ptr<KMLDataCollection>;
 
   using BookmarksChangedCallback = std::function<void()>;
+  using CategoriesChangedCallback = std::function<void()>;
   using ElevationActivePointChangedCallback = std::function<void()>;
   using ElevationMyPositionChangedCallback = std::function<void()>;
 
@@ -184,6 +185,7 @@ public:
   void ResetRegionAddressGetter();
 
   void SetBookmarksChangedCallback(BookmarksChangedCallback && callback);
+  void SetCategoriesChangedCallback(CategoriesChangedCallback && callback);
   void SetAsyncLoadingCallbacks(AsyncLoadingCallbacks && callbacks);
   bool IsAsyncLoadingInProgress() const { return m_asyncLoadingInProgress; }
 
@@ -414,16 +416,16 @@ public:
 
   bool IsMyCategory(kml::MarkGroupId categoryId) const;
 
-  // CheckInvalidCategories checks invalid categories asynchronously, it prepares a state for following
+  // CheckExpiredCategories checks invalid categories asynchronously, it prepares a state for following
   // functions calls.
-  using CheckInvalidCategoriesHandler = std::function<void(bool hasInvalidCategories)>;
-  void CheckInvalidCategories(CheckInvalidCategoriesHandler && handler);
+  using CheckExpiredCategoriesHandler = std::function<void(bool hasExpiredCategories)>;
+  void CheckExpiredCategories(CheckExpiredCategoriesHandler && handler);
 
   // The following 2 functions allow to delete invalid categories or forget about them.
-  // These functions are stateful, so they must be called after finishing CheckInvalidCategoriesHandler.
-  // ResetInvalidCategories resets internal state.
-  void DeleteInvalidCategories();
-  void ResetInvalidCategories();
+  // These functions are stateful, so they must be called after finishing CheckExpiredCategoriesHandler.
+  // ResetExpiredCategories resets internal state.
+  void DeleteExpiredCategories();
+  void ResetExpiredCategories();
 
   void FilterInvalidBookmarks(kml::MarkIdCollection & bookmarks) const;
   void FilterInvalidTracks(kml::TrackIdCollection & tracks) const;
@@ -521,6 +523,7 @@ private:
     void AcceptDirtyItems();
     bool HasChanges() const;
     bool HasBookmarksChanges() const;
+    bool HasCategoriesChanges() const;
     void ResetChanges();
     void AddChanges(MarksChangesTracker const & changes);
 
@@ -552,6 +555,7 @@ private:
 
     void InsertBookmark(kml::MarkId markId, kml::MarkGroupId catId,
                         GroupMarkIdSet & setToInsert, GroupMarkIdSet & setToErase);
+    bool HasBookmarkCategories(kml::GroupIdSet const & groupIds) const;
 
     BookmarkManager * m_bmManager;
 
@@ -683,6 +687,7 @@ private:
   void UpdateBmGroupIdList();
 
   void NotifyBookmarksChanged();
+  void NotifyCategoriesChanged();
 
   void SendBookmarksChanges(MarksChangesTracker const & changesTracker);
   void GetBookmarksInfo(kml::MarkIdSet const & marks, std::vector<BookmarkInfo> & bookmarks);
@@ -788,7 +793,8 @@ private:
   std::unique_ptr<search::RegionAddressGetter> m_regionAddressGetter;
   std::mutex m_regionAddressMutex;
 
-  BookmarksChangedCallback m_categoriesChangedCallback;
+  BookmarksChangedCallback m_bookmarksChangedCallback;
+  CategoriesChangedCallback m_categoriesChangedCallback;
   ElevationActivePointChangedCallback m_elevationActivePointChanged;
   ElevationMyPositionChangedCallback m_elevationMyPositionChanged;
   m2::PointD m_lastElevationMyPosition = m2::PointD::Zero();
@@ -861,7 +867,15 @@ private:
   };
   std::map<std::string, RestoringCache> m_restoringCache;
 
-  std::vector<kml::MarkGroupId> m_invalidCategories;
+  struct ExpiredCategory
+  {
+    ExpiredCategory(kml::MarkGroupId id, std::string const & serverId)
+      : m_id(id), m_serverId(serverId) {}
+
+    kml::MarkGroupId m_id;
+    std::string m_serverId;
+  };
+  std::vector<ExpiredCategory> m_expiredCategories;
 
 
   struct Properties

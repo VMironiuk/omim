@@ -14,7 +14,8 @@ BaseContext::TokenType BaseContext::FromModelType(Model::Type type)
 {
   switch (type)
   {
-  case Model::TYPE_POI: return TOKEN_TYPE_POI;
+  case Model::TYPE_SUBPOI: return TOKEN_TYPE_SUBPOI;
+  case Model::TYPE_COMPLEX_POI: return TOKEN_TYPE_COMPLEX_POI;
   case Model::TYPE_BUILDING: return TOKEN_TYPE_BUILDING;
   case Model::TYPE_STREET: return TOKEN_TYPE_STREET;
   case Model::TYPE_SUBURB: return TOKEN_TYPE_SUBURB;
@@ -89,7 +90,8 @@ string ToString(BaseContext::TokenType type)
 {
   switch (type)
   {
-  case BaseContext::TOKEN_TYPE_POI: return "POI";
+  case BaseContext::TOKEN_TYPE_SUBPOI: return "SUBPOI";
+  case BaseContext::TOKEN_TYPE_COMPLEX_POI: return "COMPLEX_POI";
   case BaseContext::TOKEN_TYPE_BUILDING: return "BUILDING";
   case BaseContext::TOKEN_TYPE_STREET: return "STREET";
   case BaseContext::TOKEN_TYPE_SUBURB: return "SUBURB";

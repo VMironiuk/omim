@@ -68,6 +68,13 @@ std::string StartTransactionUrl()
   return kServerUrl + "registrar/preorder";
 }
 
+std::string TrialEligibilityUrl()
+{
+  if (kServerUrl.empty())
+    return {};
+  return kServerUrl + "registrar/check_trial";
+}
+
 struct ReceiptData
 {
   ReceiptData(std::string const & data, std::string const & type)
@@ -105,10 +112,32 @@ struct ValidationData
 
 struct ValidationResult
 {
+  bool m_isValid = false;
+  bool m_isTrial = false;
+  bool m_isTrialAvailable = false;
   std::string m_reason;
 
-  DECLARE_VISITOR(visitor(m_reason, "reason"))
+  DECLARE_VISITOR(visitor(m_isValid, false, "valid"),
+                  visitor(m_isTrial, false, "is_trial_period"),
+                  visitor(m_isTrialAvailable, false, "is_trial_available"),
+                  visitor(m_reason, std::string(), "reason"))
 };
+
+ValidationResult DeserializeResponse(std::string const & response, int httpCode)
+{
+  ValidationResult result;
+  try
+  {
+    coding::DeserializerJson deserializer(response);
+    deserializer(result);
+  }
+  catch(std::exception const & e)
+  {
+    LOG(LWARNING, ("Bad server response. Code =", httpCode, ". Reason =", e.what()));
+  }
+
+  return result;
+}
 }  // namespace
 
 Purchase::Purchase(InvalidTokenHandler && onInvalidToken)
@@ -152,7 +181,7 @@ bool Purchase::IsSubscriptionActive(SubscriptionType type) const
   return m_subscriptionData[base::Underlying(type)]->m_isActive;
 }
 
-void Purchase::SetSubscriptionEnabled(SubscriptionType type, bool isEnabled)
+void Purchase::SetSubscriptionEnabled(SubscriptionType type, bool isEnabled, bool isTrialActive)
 {
   CHECK(type != SubscriptionType::Count, ());
 
@@ -167,6 +196,11 @@ void Purchase::SetSubscriptionEnabled(SubscriptionType type, bool isEnabled)
     listener->OnSubscriptionChanged(type, isEnabled);
 
   auto const nowStr = GetPlatform().GetMarketingService().GetPushWooshTimestamp();
+  if (isTrialActive)
+  {
+    GetPlatform().GetMarketingService().SendPushWooshTag(
+      marketing::kSubscriptionBookmarksAllTrialEnabled, nowStr);
+  }
   if (type == SubscriptionType::BookmarksSights)
   {
     GetPlatform().GetMarketingService().SendPushWooshTag(isEnabled ?
@@ -196,13 +230,13 @@ void Purchase::Validate(ValidationInfo const & validationInfo, std::string const
   if (url.empty() || status == Platform::EConnectionType::CONNECTION_NONE || !validationInfo.IsValid())
   {
     if (m_validationCallback)
-      m_validationCallback(ValidationCode::ServerError, validationInfo);
+      m_validationCallback(ValidationCode::ServerError, ValidationResponse(validationInfo));
     return;
   }
 
   GetPlatform().RunTask(Platform::Thread::Network, [this, url, validationInfo, accessToken]()
   {
-    ValidateImpl(url, validationInfo, accessToken, false /* startTransaction */,
+    ValidateImpl(url, validationInfo, accessToken, RequestType::Validation,
                  0 /* attemptIndex */, kFirstWaitingTimeInSec);
   });
 }
@@ -227,13 +261,39 @@ void Purchase::StartTransaction(std::string const & serverId, std::string const 
 
   GetPlatform().RunTask(Platform::Thread::Network, [this, url, info, accessToken]()
   {
-    ValidateImpl(url, info, accessToken, true /* startTransaction */,
+    ValidateImpl(url, info, accessToken, RequestType::StartTransaction,
+                 0 /* attemptIndex */, kFirstWaitingTimeInSec);
+  });
+}
+
+void Purchase::SetTrialEligibilityCallback(TrialEligibilityCallback && callback)
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+  m_trialEligibilityCallback = std::move(callback);
+}
+
+void Purchase::CheckTrialEligibility(ValidationInfo const & validationInfo)
+{
+  CHECK_THREAD_CHECKER(m_threadChecker, ());
+
+  std::string const url = TrialEligibilityUrl();
+  auto const status = GetPlatform().ConnectionStatus();
+  if (url.empty() || status == Platform::EConnectionType::CONNECTION_NONE || !validationInfo.IsValid())
+  {
+    if (m_trialEligibilityCallback)
+      m_trialEligibilityCallback(TrialEligibilityCode::ServerError);
+    return;
+  }
+
+  GetPlatform().RunTask(Platform::Thread::Network, [this, url, validationInfo]()
+  {
+    ValidateImpl(url, validationInfo, {} /* accessToken */, RequestType::TrialEligibility,
                  0 /* attemptIndex */, kFirstWaitingTimeInSec);
   });
 }
 
 void Purchase::ValidateImpl(std::string const & url, ValidationInfo const & validationInfo,
-                            std::string const & accessToken, bool startTransaction,
+                            std::string const & accessToken, RequestType requestType,
                             uint8_t attemptIndex, uint32_t waitingTimeInSeconds)
 {
   platform::HttpClient request(url);
@@ -251,13 +311,16 @@ void Purchase::ValidateImpl(std::string const & url, ValidationInfo const & vali
   }
   request.SetBodyData(std::move(jsonStr), "application/json");
 
+  ValidationResult result;
   ValidationCode code = ValidationCode::ServerError;
   if (request.RunHttpRequest())
   {
     auto const resultCode = request.ErrorCode();
     if (resultCode >= 200 && resultCode < 300)
     {
-      code = ValidationCode::Verified;
+      result = DeserializeResponse(request.ServerResponse(), resultCode);
+      if (result.m_isValid)
+        code = ValidationCode::Verified;
     }
     else if (resultCode == 403)
     {
@@ -270,16 +333,8 @@ void Purchase::ValidateImpl(std::string const & url, ValidationInfo const & vali
     {
       code = ValidationCode::NotVerified;
 
-      ValidationResult result;
-      try
-      {
-        coding::DeserializerJson deserializer(request.ServerResponse());
-        deserializer(result);
-      }
-      catch(std::exception const & e)
-      {
-        LOG(LWARNING, ("Bad server response. Code =", resultCode, ". Reason =", e.what()));
-      }
+      result = DeserializeResponse(request.ServerResponse(), resultCode);
+
       if (!result.m_reason.empty())
         LOG(LWARNING, ("Validation error:", result.m_reason));
     }
@@ -300,18 +355,18 @@ void Purchase::ValidateImpl(std::string const & url, ValidationInfo const & vali
     ++attemptIndex;
     waitingTimeInSeconds *= kWaitingTimeScaleFactor;
     GetPlatform().RunDelayedTask(Platform::Thread::Network, delayTime,
-                                 [this, url, validationInfo, accessToken, startTransaction,
+                                 [this, url, validationInfo, accessToken, requestType,
                                   attemptIndex, waitingTimeInSeconds]()
     {
-      ValidateImpl(url, validationInfo, accessToken, startTransaction,
+      ValidateImpl(url, validationInfo, accessToken, requestType,
                    attemptIndex, waitingTimeInSeconds);
     });
   }
   else
   {
-    GetPlatform().RunTask(Platform::Thread::Gui, [this, code, startTransaction, validationInfo]()
+    GetPlatform().RunTask(Platform::Thread::Gui, [this, code, requestType, validationInfo, result]()
     {
-      if (startTransaction)
+      if (requestType == RequestType::StartTransaction)
       {
         if (m_startTransactionCallback)
         {
@@ -319,10 +374,25 @@ void Purchase::ValidateImpl(std::string const & url, ValidationInfo const & vali
                                      validationInfo.m_serverId, validationInfo.m_vendorId);
         }
       }
-      else
+      else if (requestType == RequestType::Validation)
       {
         if (m_validationCallback)
-          m_validationCallback(code, validationInfo);
+          m_validationCallback(code, {validationInfo, result.m_isTrial});
+      }
+      else if (requestType == RequestType::TrialEligibility)
+      {
+        if (m_trialEligibilityCallback)
+        {
+          TrialEligibilityCode eligibilityCode;
+          if (code == ValidationCode::ServerError)
+            eligibilityCode = TrialEligibilityCode::ServerError;
+          else if (code == ValidationCode::Verified && result.m_isTrialAvailable)
+            eligibilityCode = TrialEligibilityCode::Eligible;
+          else
+            eligibilityCode = TrialEligibilityCode::NotEligible;
+
+          m_trialEligibilityCallback(eligibilityCode);
+        }
       }
     });
   }

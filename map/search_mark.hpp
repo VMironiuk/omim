@@ -13,7 +13,9 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 class BookmarkManager;
@@ -46,16 +48,21 @@ public:
   void SetPreparing(bool isPreparing);
   void SetRating(float rating);
   void SetPricing(int pricing);
+  void SetPrice(std::string && price);
   void SetSale(bool hasSale);
+  void SetVisited(bool isVisited);
+  void SetAvailable(bool isAvailable);
+  void SetReason(std::string const & reason);
 
 protected:
-  template<typename T> void SetAttributeValue(T & dst, T const & src)
+  template <typename T, typename U>
+  void SetAttributeValue(T & dst, U && src)
   {
     if (dst == src)
       return;
 
     SetDirty();
-    dst = src;
+    dst = std::forward<U>(src);
   }
 
   bool IsBookingSpecialMark() const;
@@ -71,9 +78,13 @@ protected:
   bool m_isPreparing = false;
   float m_rating = 0.0f;
   int m_pricing = 0;
+  std::string m_price;
   bool m_hasSale = false;
   dp::TitleDecl m_titleDecl;
   dp::TitleDecl m_ugcTitleDecl;
+  bool m_isVisited = false;
+  bool m_isAvailable = true;
+  std::string m_reason;
 };
 
 class SearchMarks
@@ -92,15 +103,31 @@ public:
   // NOTE: Vector of features must be sorted.
   void SetSales(std::vector<FeatureID> const & features, bool hasSale);
 
+  // NOTE: Vector of features must be sorted.
+  void SetPrices(std::vector<FeatureID> const & features, std::vector<std::string> && prices);
+
+  void OnActivate(FeatureID const & featureId);
+  void OnDeactivate(FeatureID const & featureId);
+
+  bool IsUsed(FeatureID const & id) const;
+  void ClearUsed();
+
+  void AppendUnavailable(FeatureID const & id, std::string const & reason);
+  bool IsUnavailable(FeatureID const & id) const;
+  void MarkUnavailableIfNeeded(SearchMarkPoint * mark) const;
+  void ClearUnavailable();
+
   static bool HaveSizes() { return !m_searchMarksSizes.empty(); };
   static std::optional<m2::PointD> GetSize(std::string const & symbolName);
 
 private:
-  void FilterAndProcessMarks(std::vector<FeatureID> const & features,
-                             std::function<void(SearchMarkPoint *)> && processor);
+  void ProcessMarks(std::function<void(SearchMarkPoint *)> && processor);
 
   BookmarkManager * m_bmManager;
   df::DrapeEngineSafePtr m_drapeEngine;
 
   static std::map<std::string, m2::PointF> m_searchMarksSizes;
+
+  std::set<FeatureID> m_used;
+  std::map<FeatureID, std::string> m_unavailable;
 };

@@ -1804,7 +1804,9 @@
 	<string name="connection_error_dialog_guides_try">Réessayer</string>
 	<string name="connection_error_dialog_guides_layer_turn_off">Désactiver</string>
 	<string name="connection_error_toast_guides">Reconnexion à Internet en cours</string>
-	<string name="routes_card_show">Montrer</string>
+	<!-- as few symbols as possible -->
+	<string name="routes_card_show">Voir sur la carte</string>
+	<!-- as few symbols as possible -->
 	<string name="routes_card_hide">Masquer</string>
 	<string name="whatsnew_catalog_new_title">Nouveau catalogue et des miliers d\'idées de voyages</string>
 	<string name="whatsnew_catalog_new_message">Nous avons mis à jour le catalogue des guides et avons ajouté les traductions dans toutes les langues. Planifiez vos voyages à l\'avance !</string>
@@ -1890,6 +1892,15 @@
 	<string name="type.amenity.pub">Bistrot</string>
 	<string name="type.amenity.public_bookcase">Bibliothèque</string>
 	<string name="type.amenity.recycling">Centre de recyclage</string>
+	<string name="type.amenity.recycling_container">Conteneur de recyclage</string>
+	<string name="type.recycling.toxic">Déchets toxiques</string>
+	<string name="type.recycling.clothes">Vêtement usagés</string>
+	<string name="type.recycling.glass_bottles">Verre</string>
+	<string name="type.recycling.paper">Papier usagé</string>
+	<string name="type.recycling.plastic">Déchets plastiques</string>
+	<string name="type.recycling.plastic_bottles">Collecte de bouteilles en plastique</string>
+	<string name="type.recycling.scrap_metal">Ferraille</string>
+	<string name="type.recycling.small_appliances">Déchets d\'équipements électriques</string>
 	<string name="type.amenity.school">École</string>
 	<string name="type.amenity.shelter">Refuge</string>
 	<string name="type.amenity.shower">Douche</string>
@@ -2032,6 +2043,7 @@
 	<string name="type.highway.footway.mountain_hiking">Chemin</string>
 	<string name="type.highway.footway.permissive">Chemin</string>
 	<string name="type.highway.footway.tunnel">Chemin</string>
+	<string name="type.highway.ford">Gué</string>
 	<string name="type.highway.living_street">Rue</string>
 	<string name="type.highway.living_street.bridge">Rue</string>
 	<string name="type.highway.living_street.tunnel">Rue</string>

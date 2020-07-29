@@ -36,6 +36,9 @@ char const * const kSubscriptionBookmarksSightsDisabled =
   "bookmark_catalog_subscription_city_disabled";
 char const * const kRemoveAdsSubscriptionEnabled = "remove_ads_subscription_enabled";
 char const * const kRemoveAdsSubscriptionDisabled = "remove_ads_subscription_disabled";
+char const * const kSubscriptionContentDeleted = "bookmark_catalog_subscription_content_deleted";
+char const * const kSubscriptionBookmarksAllTrialEnabled =
+  "bookmark_catalog_subscription_city_outdoor_trial_enabled";
 
 // Events.
 char const * const kDownloaderMapActionFinished = "Downloader_Map_action_finished";

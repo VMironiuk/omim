@@ -50,6 +50,7 @@ public class NavigationController implements TrafficManager.TrafficCallback, Vie
   private final View mFrame;
   private final View mBottomFrame;
   private final View mSearchButtonFrame;
+  @NonNull
   private final NavMenu mNavMenu;
 
   private final ImageView mNextTurnImage;
@@ -151,11 +152,6 @@ public class NavigationController implements TrafficManager.TrafficCallback, Vie
   {
     mNavMenu.onResume(null);
     mSearchWheel.onResume();
-  }
-
-  public boolean performSearchClick()
-  {
-    return mSearchWheel.performClick();
   }
 
   private NavMenu createNavMenu()
@@ -381,6 +377,7 @@ public class NavigationController implements TrafficManager.TrafficCallback, Vie
     mSearchWheel.reset();
   }
 
+  @NonNull
   public NavMenu getNavMenu()
   {
     return mNavMenu;

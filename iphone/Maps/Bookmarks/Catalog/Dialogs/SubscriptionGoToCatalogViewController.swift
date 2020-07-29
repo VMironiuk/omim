@@ -6,8 +6,8 @@
 
   @IBOutlet private var titleLabel: UILabel!
   @IBOutlet private var textLabel: UILabel!
-  
-  @objc init(_ screenType:SubscriptionGroupType, onOk: @escaping MWMVoidBlock, onCancel: @escaping MWMVoidBlock) {
+
+  @objc init(_ screenType: SubscriptionGroupType, onOk: @escaping MWMVoidBlock, onCancel: @escaping MWMVoidBlock) {
     self.onOk = onOk
     self.onCancel = onCancel
     self.screenType = screenType
@@ -23,7 +23,7 @@
   override func awakeFromNib() {
     super.awakeFromNib()
     switch screenType {
-    case .sightseeing:
+    case .city:
       titleLabel.text = L("subscription_success_dialog_title_sightseeing_pass")
       textLabel.text = L("subscription_success_dialog_message_sightseeing_pass")
     case .allPass:

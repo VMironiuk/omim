@@ -5,6 +5,9 @@
 #include "generator/osm_element_helpers.hpp"
 #include "generator/utils.hpp"
 
+#include "storage/country_info_getter.hpp"
+#include "storage/country_tree_helpers.hpp"
+
 #include "indexer/classificator.hpp"
 #include "indexer/feature_impl.hpp"
 
@@ -15,6 +18,8 @@
 #include "base/assert.hpp"
 #include "base/stl_helpers.hpp"
 #include "base/string_utils.hpp"
+
+#include "defines.hpp"
 
 #include <algorithm>
 #include <initializer_list>
@@ -46,8 +51,8 @@ public:
     if (!token)
       return false;
 
-    // Is this an international (latin) name.
-    if (*token == "int_name")
+    // Is this an international (latin) / old / alternative name.
+    if (*token == "int_name" || *token == "old_name" || *token == "alt_name")
     {
       lang = *token;
       return m_savedNames.insert(lang).second;
@@ -176,6 +181,7 @@ public:
     WheelchairYes,
     BarrierGate,
     Toll,
+    BicycleOnedir,
     Count
   };
 
@@ -207,7 +213,8 @@ public:
         {Type::SubwayStation,      {"railway", "station", "subway"}},
         {Type::WheelchairYes,      {"wheelchair", "yes"}},
         {Type::BarrierGate,        {"barrier", "gate"}},
-        {Type::Toll,               {"hwtag", "toll"}}};
+        {Type::Toll,               {"hwtag", "toll"}},
+        {Type::BicycleOnedir,      {"hwtag", "onedir_bicycle"}}};
 
     m_types.resize(static_cast<size_t>(Type::Count));
     for (auto const & kv : kTypeToName)
@@ -615,6 +622,27 @@ void PreprocessElement(OsmElement * p)
       value = dePlace;
     });
   }
+
+  // In Japan, South Korea and Turkey place=province means place=state.
+  auto static const infoGetter = storage::CountryInfoReader::CreateCountryInfoGetter(GetPlatform());
+  CHECK(infoGetter, ());
+  auto static const countryTree = storage::LoadCountriesFromFile(COUNTRIES_FILE);
+  CHECK(countryTree, ());
+  p->UpdateTag("place", [&](string & value) {
+    if (value != "province")
+      return;
+
+    std::array<storage::CountryId, 3> const provinceToStateCountries = {"Japan", "South Korea",
+                                                                        "Turkey"};
+    auto const pt = mercator::FromLatLon(p->m_lat, p->m_lon);
+    auto const countryId = infoGetter->GetRegionCountryId(pt);
+    auto const country = storage::GetTopmostParentFor(*countryTree, countryId);
+    if (base::FindIf(provinceToStateCountries, [&](auto const & c) { return c == country; }) !=
+        provinceToStateCountries.end())
+    {
+      value = "state";
+    }
+  });
 }
 
 void PostprocessElement(OsmElement * p, FeatureBuilderParams & params)
@@ -688,6 +716,8 @@ void PostprocessElement(OsmElement * p, FeatureBuilderParams & params)
           {"cycleway:left", "~", [&params] { params.AddType(types.Get(CachedTypes::Type::YesBicycle)); }},
           {"oneway:bicycle", "!",
            [&params] { params.AddType(types.Get(CachedTypes::Type::BicycleBidir)); }},
+          {"oneway:bicycle", "~",
+           [&params] { params.AddType(types.Get(CachedTypes::Type::BicycleOnedir)); }},
           {"cycleway", "opposite",
            [&params] { params.AddType(types.Get(CachedTypes::Type::BicycleBidir)); }},
 

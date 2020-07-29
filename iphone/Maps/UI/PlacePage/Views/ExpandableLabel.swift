@@ -1,6 +1,6 @@
 final class ExpandableLabel: UIView {
   typealias OnExpandClosure = (() -> Void) -> Void
-  
+
   private let stackView = UIStackView()
   private let textView = UITextView()
   private let expandLabel = UILabel()
@@ -30,7 +30,11 @@ final class ExpandableLabel: UIView {
     didSet {
       containerText = text
       textView.text = text
-      expandLabel.isHidden = true
+      if let text = text {
+        isHidden = text.isEmpty
+      } else {
+        isHidden = true
+      }
     }
   }
 
@@ -38,7 +42,11 @@ final class ExpandableLabel: UIView {
     didSet {
       containerText = attributedText?.string
       textView.attributedText = attributedText
-      expandLabel.isHidden = true
+      if let attributedText = attributedText {
+        isHidden = attributedText.length == 0
+      } else {
+        isHidden = true
+      }
     }
   }
 
@@ -62,6 +70,8 @@ final class ExpandableLabel: UIView {
     }
   }
 
+  private var oldWidth: CGFloat = 0
+
   override func setContentHuggingPriority(_ priority: UILayoutPriority, for axis: NSLayoutConstraint.Axis) {
     super.setContentHuggingPriority(priority, for: axis)
     textView.setContentHuggingPriority(priority, for: axis)
@@ -82,7 +92,7 @@ final class ExpandableLabel: UIView {
     stackView.axis = .vertical
     stackView.alignment = .leading
     containerMaximumNumberOfLines = numberOfLines > 0 ? numberOfLines + 1 : 0
-    textView.textContainer.lineFragmentPadding = 0;
+    textView.textContainer.lineFragmentPadding = 0
     textView.isScrollEnabled = false
     textView.isEditable = false
     textView.textContainerInset = .zero
@@ -92,6 +102,7 @@ final class ExpandableLabel: UIView {
     textView.text = text
     textView.attributedText = attributedText
     textView.setContentHuggingPriority(contentHuggingPriority(for: .vertical), for: .vertical)
+    textView.backgroundColor = .clear
     expandLabel.setContentHuggingPriority(contentHuggingPriority(for: .vertical), for: .vertical)
     expandLabel.font = font
     expandLabel.textColor = expandColor
@@ -108,7 +119,7 @@ final class ExpandableLabel: UIView {
 
   @objc func onExpand(_ sender: UITapGestureRecognizer) {
     if expandLabel.isHidden { return }
-    
+
     let expandClosure = {
       UIView.animate(withDuration: kDefaultAnimationDuration) {
         self.containerMaximumNumberOfLines = 0
@@ -126,6 +137,12 @@ final class ExpandableLabel: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
 
+    if oldWidth != bounds.width, let attributedText = attributedText?.mutableCopy() as? NSMutableAttributedString {
+      attributedText.enumerateAttachments(estimatedWidth: bounds.width)
+      self.attributedText = attributedText
+      oldWidth = bounds.width
+    }
+    
     guard containerMaximumNumberOfLines > 0,
       containerMaximumNumberOfLines != numberOfLines,
       let s = containerText,

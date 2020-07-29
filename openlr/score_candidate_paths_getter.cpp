@@ -55,6 +55,20 @@ double DifferenceInDeg(double a1, double a2)
   CHECK_GREATER_OR_EQUAL(diff, 0.0, ());
   return diff;
 }
+
+void EdgeSortUniqueByStartAndEndPoints(Graph::EdgeVector & edges)
+{
+  base::SortUnique(
+      edges,
+      [](Edge const & e1, Edge const & e2) {
+        if (e1.GetStartPoint() != e2.GetStartPoint())
+          return e1.GetStartPoint() < e2.GetStartPoint();
+        return e1.GetEndPoint() < e2.GetEndPoint();
+      },
+      [](Edge const & e1, Edge const & e2) {
+        return e1.GetStartPoint() == e2.GetStartPoint() && e1.GetEndPoint() == e2.GetEndPoint();
+      });
+}
 }  // namespace
 
 // ScoreCandidatePathsGetter::Link ----------------------------------------------------------------------
@@ -71,7 +85,7 @@ bool ScoreCandidatePathsGetter::Link::IsJunctionInPath(geometry::PointWithAltitu
 {
   for (auto * l = this; l; l = l->m_parent.get())
   {
-    if (l->m_edge.GetEndJunction() == j)
+    if (l->m_edge.GetEndJunction().GetPoint() == j.GetPoint())
     {
       LOG(LDEBUG, ("A loop detected, skipping..."));
       return true;
@@ -126,6 +140,7 @@ void ScoreCandidatePathsGetter::GetAllSuitablePaths(ScoreEdgeVec const & startLi
                                                     double bearDistM,
                                                     FunctionalRoadClass functionalRoadClass,
                                                     FormOfWay formOfWay,
+                                                    double distanceToNextPointM,
                                                     vector<shared_ptr<Link>> & allPaths)
 {
   CHECK_NOT_EQUAL(source, LinearSegmentSource::NotValid, ());
@@ -156,6 +171,12 @@ void ScoreCandidatePathsGetter::GetAllSuitablePaths(ScoreEdgeVec const & startLi
     auto const & currentEdge = u->m_edge;
     auto const currentEdgeLen = EdgeLength(currentEdge);
 
+    // The path from the start of the openlr segment to the finish to the openlr segment should be
+    // much shorter then the distance of any connection of openlr segment.
+    // This condition should be checked because otherwise in rare case |q| may be overfilled.
+    if (u->m_distanceM > distanceToNextPointM)
+      continue;
+
     if (u->m_distanceM + currentEdgeLen >= bearDistM)
     {
       allPaths.emplace_back(move(u));
@@ -169,6 +190,11 @@ void ScoreCandidatePathsGetter::GetAllSuitablePaths(ScoreEdgeVec const & startLi
       m_graph.GetOutgoingEdges(currentEdge.GetEndJunction(), edges);
     else
       m_graph.GetIngoingEdges(currentEdge.GetStartJunction(), edges);
+
+    // It's possible that road edges are duplicated a lot of times. It's a error but
+    // a mapper may do that. To prevent a combinatorial explosion while matching
+    // duplicated edges should be removed.
+    EdgeSortUniqueByStartAndEndPoints(edges);
 
     for (auto const & e : edges)
     {
@@ -282,7 +308,7 @@ void ScoreCandidatePathsGetter::GetLineCandidates(openlr::LocationReferencePoint
 
   vector<shared_ptr<Link>> allPaths;
   GetAllSuitablePaths(startLines, source, isLastPoint, bearDistM, p.m_functionalRoadClass,
-                      p.m_formOfWay, allPaths);
+                      p.m_formOfWay, distanceToNextPointM, allPaths);
 
   GetBestCandidatePaths(allPaths, source, isLastPoint, p.m_bearing, bearDistM, startPoint,
                         candidates);

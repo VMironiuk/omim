@@ -70,13 +70,14 @@ class DefaultPurchaseValidator implements PurchaseValidator<ValidationCallback>,
 
   @Override
   public void onValidatePurchase(@NonNull ValidationStatus status, @NonNull String serverId,
-                                 @NonNull String vendorId, @NonNull String purchaseData)
+                                 @NonNull String vendorId, @NonNull String purchaseData,
+                                 boolean isTrial)
   {
     LOGGER.i(TAG, "Validation code: " + status);
     String orderId = PurchaseUtils.parseOrderId(purchaseData);
     mOperationObservable.removeValidationObserver(orderId);
     mValidatedOrderId = null;
     if (mCallback != null)
-      mCallback.onValidate(purchaseData, status);
+      mCallback.onValidate(purchaseData, status, isTrial);
   }
 }

@@ -422,6 +422,13 @@ drape_ptr<df::UserPointMark::TitlesInfo> SearchMarkPoint::GetTitleDecl() const
   else
   {
     titles->push_back(m_titleDecl);
+    if (!m_price.empty())
+    {
+      auto priceDecl = m_titleDecl;
+      priceDecl.m_primaryText = m_price;
+      priceDecl.m_anchor = dp::Anchor::Left;
+      titles->push_back(priceDecl);
+    }
   }
   return titles;
 }
@@ -485,9 +492,31 @@ void SearchMarkPoint::SetPricing(int pricing)
   SetAttributeValue(m_pricing, pricing);
 }
 
+void SearchMarkPoint::SetPrice(std::string && price)
+{
+  // Dummy.
+  // TODO: uncomment when drape will be ready.
+  // SetAttributeValue(m_price, std::move(price));
+}
+
 void SearchMarkPoint::SetSale(bool hasSale)
 {
   SetAttributeValue(m_hasSale, hasSale);
+}
+
+void SearchMarkPoint::SetVisited(bool isVisited)
+{
+  SetAttributeValue(m_isVisited, isVisited);
+}
+
+void SearchMarkPoint::SetAvailable(bool isAvailable)
+{
+  SetAttributeValue(m_isAvailable, isAvailable);
+}
+
+void SearchMarkPoint::SetReason(std::string const & reason)
+{
+  SetAttributeValue(m_reason, reason);
 }
 
 bool SearchMarkPoint::IsBookingSpecialMark() const
@@ -600,33 +629,116 @@ std::optional<m2::PointD> SearchMarks::GetSize(std::string const & symbolName)
 
 void SearchMarks::SetPreparingState(std::vector<FeatureID> const & features, bool isPreparing)
 {
-  FilterAndProcessMarks(features, [isPreparing](SearchMarkPoint * mark)
+  ProcessMarks([&features, isPreparing](SearchMarkPoint * mark)
   {
-    mark->SetPreparing(isPreparing);
+    ASSERT(std::is_sorted(features.begin(), features.end()), ());
+    if (std::binary_search(features.cbegin(), features.cend(), mark->GetFeatureID()))
+      mark->SetPreparing(isPreparing);
   });
 }
 
 void SearchMarks::SetSales(std::vector<FeatureID> const & features, bool hasSale)
 {
-  FilterAndProcessMarks(features, [hasSale](SearchMarkPoint * mark)
+  ProcessMarks([&features, hasSale](SearchMarkPoint * mark)
   {
-    mark->SetSale(hasSale);
+    ASSERT(std::is_sorted(features.begin(), features.end()), ());
+    if (std::binary_search(features.cbegin(), features.cend(), mark->GetFeatureID()))
+      mark->SetSale(hasSale);
   });
 }
 
-void SearchMarks::FilterAndProcessMarks(std::vector<FeatureID> const & features,
-                                        std::function<void(SearchMarkPoint *)> && processor)
+void SearchMarks::SetPrices(std::vector<FeatureID> const & features, std::vector<std::string> && prices)
+{
+  ProcessMarks([&features, &prices](SearchMarkPoint * mark)
+  {
+    ASSERT(std::is_sorted(features.begin(), features.end()), ());
+    auto const it = std::lower_bound(features.cbegin(), features.cend(), mark->GetFeatureID());
+
+    if (it == features.cend() || *it != mark->GetFeatureID())
+      return;
+
+    auto const index = std::distance(features.cbegin(), it);
+
+    ASSERT_LESS(index, prices.size(), ());
+    mark->SetPrice(std::move(prices[index]));
+  });
+}
+
+void SearchMarks::OnActivate(FeatureID const & featureId)
+{
+  ProcessMarks([this, &featureId](SearchMarkPoint * mark)
+  {
+    if (featureId != mark->GetFeatureID())
+      return;
+
+    auto const unavailableIt = m_unavailable.find(featureId);
+    if (unavailableIt != m_unavailable.cend())
+    {
+      mark->SetAvailable(false);
+      mark->SetReason(unavailableIt->second);
+    }
+  });
+}
+
+void SearchMarks::OnDeactivate(FeatureID const & featureId)
+{
+  ProcessMarks([this, &featureId](SearchMarkPoint * mark)
+  {
+    if (featureId != mark->GetFeatureID())
+      return;
+
+    mark->SetVisited(true);
+    m_used.insert(featureId);
+
+    mark->SetAvailable(true);
+    mark->SetReason({});
+  });
+}
+
+bool SearchMarks::IsUsed(FeatureID const & id) const
+{
+  return m_used.find(id) != m_used.cend();
+}
+
+void SearchMarks::ClearUsed()
+{
+  m_used.clear();
+}
+
+void SearchMarks::AppendUnavailable(FeatureID const & id, std::string const & reason)
+{
+  m_unavailable.try_emplace(id, reason);
+}
+
+bool SearchMarks::IsUnavailable(FeatureID const & id) const
+{
+  return m_unavailable.find(id) != m_unavailable.cend();
+}
+
+void SearchMarks::MarkUnavailableIfNeeded(SearchMarkPoint * mark) const
+{
+  auto const unavailableIt = m_unavailable.find(mark->GetFeatureID());
+  if (unavailableIt == m_unavailable.cend())
+    return;
+
+  mark->SetAvailable(false);
+  mark->SetReason(unavailableIt->second);
+}
+
+void SearchMarks::ClearUnavailable()
+{
+  m_unavailable.clear();
+}
+
+void SearchMarks::ProcessMarks(std::function<void(SearchMarkPoint *)> && processor)
 {
   if (m_bmManager == nullptr || processor == nullptr)
     return;
-
-  ASSERT(std::is_sorted(features.begin(), features.end()), ());
 
   auto editSession = m_bmManager->GetEditSession();
   for (auto markId : m_bmManager->GetUserMarkIds(UserMark::Type::SEARCH))
   {
     auto * mark = editSession.GetMarkForEdit<SearchMarkPoint>(markId);
-    if (std::binary_search(features.begin(), features.end(), mark->GetFeatureID()))
-      processor(mark);
+    processor(mark);
   }
 }
