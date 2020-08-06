@@ -30,10 +30,11 @@ public:
   drape_ptr<TitlesInfo> GetTitleDecl() const override;
   int GetMinTitleZoom() const override;
   df::DepthLayer GetDepthLayer() const override;
-  drape_ptr<SymbolNameZoomInfo> GetBadgeNames() const override;
+  drape_ptr<BageInfo> GetBadgeInfo() const override;
   drape_ptr<SymbolOffsets> GetSymbolOffsets() const override;
   bool GetDepthTestEnabled() const override { return false; }
   bool IsMarkAboveText() const override;
+  float GetSymbolOpacity() const override;
 
   FeatureID GetFeatureID() const override { return m_featureID; }
   void SetFoundFeature(FeatureID const & feature);
@@ -66,7 +67,13 @@ protected:
   }
 
   bool IsBookingSpecialMark() const;
+  bool HasGoodRating() const;
+  bool HasPrice() const;
+  bool HasPricing() const;
+  bool HasRating() const;
   bool IsUGCMark() const;
+  bool IsSelected() const;
+  bool HasSale() const;
   std::string GetSymbolName() const;
   std::string GetBadgeName() const;
 
@@ -81,6 +88,7 @@ protected:
   std::string m_price;
   bool m_hasSale = false;
   dp::TitleDecl m_titleDecl;
+  dp::TitleDecl m_badgeTitleDecl;
   dp::TitleDecl m_ugcTitleDecl;
   bool m_isVisited = false;
   bool m_isAvailable = true;
@@ -109,10 +117,10 @@ public:
   void OnActivate(FeatureID const & featureId);
   void OnDeactivate(FeatureID const & featureId);
 
-  bool IsUsed(FeatureID const & id) const;
-  void ClearUsed();
+  bool IsVisited(FeatureID const & id) const;
+  void ClearVisited();
 
-  void AppendUnavailable(FeatureID const & id, std::string const & reason);
+  void SetUnavailable(FeatureID const & id, std::string const & reason);
   bool IsUnavailable(FeatureID const & id) const;
   void MarkUnavailableIfNeeded(SearchMarkPoint * mark) const;
   void ClearUnavailable();
@@ -128,6 +136,7 @@ private:
 
   static std::map<std::string, m2::PointF> m_searchMarksSizes;
 
-  std::set<FeatureID> m_used;
+  std::set<FeatureID> m_visited;
+  // The value is localized string key for unavailability reason.
   std::map<FeatureID, std::string> m_unavailable;
 };

@@ -25,7 +25,10 @@ vector<uint8_t> CreateDataPacketImpl(Container const & points,
   {
   case tracking::Protocol::PacketType::DataV0: version = 0; break;
   case tracking::Protocol::PacketType::DataV1: version = 1; break;
-  case tracking::Protocol::PacketType::AuthV0: ASSERT(false, ("Not a DATA packet.")); break;
+  case tracking::Protocol::PacketType::Error:
+  case tracking::Protocol::PacketType::AuthV0:
+    LOG(LERROR, ("Can't create a non-DATA packet as a DATA packet. PacketType =", type));
+    return {};
   }
 
   tracking::Protocol::Encoder::SerializeDataPoints(version, writer, points);
@@ -78,7 +81,11 @@ vector<uint8_t> Protocol::CreateDataPacket(DataElementsVec const & points, Packe
 //  static
 pair<Protocol::PacketType, size_t> Protocol::DecodeHeader(vector<uint8_t> const & data)
 {
-  ASSERT_GREATER_OR_EQUAL(data.size(), sizeof(uint32_t /* header */), ());
+  if (data.size() < sizeof(uint32_t /* header */))
+  {
+    LOG(LWARNING, ("Header size is too small", data.size(), sizeof(uint32_t /* header */)));
+    return make_pair(PacketType::Error, data.size());
+  }
 
   uint32_t size = (*reinterpret_cast<uint32_t const *>(data.data())) & 0xFFFFFF00;
   if (!IsBigEndianMacroBased())
@@ -93,8 +100,11 @@ string Protocol::DecodeAuthPacket(Protocol::PacketType type, vector<uint8_t> con
   switch (type)
   {
   case Protocol::PacketType::AuthV0: return string(begin(data), end(data));
+  case Protocol::PacketType::Error:
   case Protocol::PacketType::DataV0:
-  case Protocol::PacketType::DataV1: ASSERT(false, ("Not an AUTH packet.")); break;
+  case Protocol::PacketType::DataV1:
+    LOG(LERROR, ("Error decoding AUTH packet. PacketType =", type));
+    break;
   }
   return string();
 }
@@ -115,7 +125,10 @@ Protocol::DataElementsVec Protocol::DecodeDataPacket(PacketType type, vector<uin
     case Protocol::PacketType::DataV1:
       Encoder::DeserializeDataPoints(1 /* version */, src, points);
       break;
-    case Protocol::PacketType::AuthV0: ASSERT(false, ("Not a DATA packet.")); break;
+    case Protocol::PacketType::Error:
+    case Protocol::PacketType::AuthV0:
+      LOG(LERROR, ("Error decoding DATA packet. PacketType =", type));
+      return {};
     }
     return points;
   }
@@ -145,6 +158,7 @@ string DebugPrint(Protocol::PacketType type)
 {
   switch (type)
   {
+  case Protocol::PacketType::Error: return "Error";
   case Protocol::PacketType::AuthV0: return "AuthV0";
   case Protocol::PacketType::DataV0: return "DataV0";
   case Protocol::PacketType::DataV1: return "DataV1";

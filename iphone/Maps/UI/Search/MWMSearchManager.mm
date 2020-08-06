@@ -128,6 +128,15 @@ using Observers = NSHashTable<Observer>;
 
 - (IBAction)onBookingDateButtonPressed:(id)sender {
   [self.searchTextField resignFirstResponder];
+
+  if (Platform::ConnectionStatus() == Platform::EConnectionType::CONNECTION_NONE) {
+    [MWMAlertViewController.activeAlertController presentSearchQuickFilterNoConnectionAlert];
+    [Statistics logEvent:kStatSearchQuickFilterError withParameters:@{kStatCategory: kStatHotel,
+                                                                      kStatError: @"no internet",
+                                                                      kStatFilter: kStatDate}];
+    return;
+  }
+
   DatePickerViewController *controller = [[DatePickerViewController alloc] init];
   controller.delegate = self;
   controller.popoverPresentationController.sourceView = self.searchBarView;
@@ -137,6 +146,15 @@ using Observers = NSHashTable<Observer>;
 
 - (IBAction)onBookingGuestsButtonPressed:(id)sender {
   [self.searchTextField resignFirstResponder];
+
+  if (Platform::ConnectionStatus() == Platform::EConnectionType::CONNECTION_NONE) {
+    [MWMAlertViewController.activeAlertController presentSearchQuickFilterNoConnectionAlert];
+    [Statistics logEvent:kStatSearchQuickFilterError withParameters:@{kStatCategory: kStatHotel,
+                                                                      kStatError: @"no internet",
+                                                                      kStatFilter: kStatSearchRooms}];
+    return;
+  }
+
   GuestsPickerViewController *controller = [[GuestsPickerViewController alloc] init];
   controller.delegate = self;
   controller.popoverPresentationController.sourceView = self.searchBarView;
@@ -229,8 +247,12 @@ using Observers = NSHashTable<Observer>;
   [self endSearch];
 
   MWMMapViewControlsManager *controlsManager = self.controlsManager;
-  controlsManager.menuState = controlsManager.menuRestoreState;
+  auto const navigationManagerState = [MWMNavigationDashboardManager sharedManager].state;
+  if (navigationManagerState == MWMNavigationDashboardStateHidden) {
+    controlsManager.menuState = controlsManager.menuRestoreState;
+  }
   [self viewHidden:YES];
+  self.searchBarView.isBookingSearchViewHidden = YES;
 }
 
 - (void)changeToDefaultState {
@@ -243,7 +265,10 @@ using Observers = NSHashTable<Observer>;
   [self animateConstraints:^{
     self.contentViewTopHidden.priority = UILayoutPriorityDefaultLow;
   }];
-  controlsManager.menuState = controlsManager.menuRestoreState;
+  auto const navigationManagerState = [MWMNavigationDashboardManager sharedManager].state;
+  if (navigationManagerState == MWMNavigationDashboardStateHidden) {
+    controlsManager.menuState = controlsManager.menuRestoreState;
+  }
   [self viewHidden:NO];
   self.searchBarView.isBookingSearchViewHidden = ![MWMSearch isHotelResults];
   self.actionBarState = MWMSearchManagerActionBarStateHidden;
@@ -259,7 +284,10 @@ using Observers = NSHashTable<Observer>;
   self.searchBarView.state = SearchBarStateReady;
   GetFramework().DeactivateMapSelection(true);
   [self updateTableSearchActionBar];
-  controlsManager.menuState = controlsManager.menuRestoreState;
+  auto const navigationManagerState = [MWMNavigationDashboardManager sharedManager].state;
+  if (navigationManagerState == MWMNavigationDashboardStateHidden) {
+    controlsManager.menuState = controlsManager.menuRestoreState;
+  }
   [self viewHidden:NO];
   [MWMSearch setSearchOnMap:NO];
   [self.tableViewController reloadData];
@@ -393,8 +421,8 @@ using Observers = NSHashTable<Observer>;
 #pragma mark - DatePickerViewControllerDelegate
 
 - (void)datePicker:(DatePickerViewController *)datePicker
-didSelectStartDate:(NSDate *)startDate
-           endDate:(NSDate *)endDate {
+  didSelectStartDate:(NSDate *)startDate
+             endDate:(NSDate *)endDate {
   [self.searchBarView setDatesWithCheckin:startDate checkout:endDate];
   MWMHotelParams *filter = [MWMSearch getFilter];
   if (!filter) {
@@ -408,6 +436,14 @@ didSelectStartDate:(NSDate *)startDate
 
 - (void)datePickerDidCancel:(DatePickerViewController *)datePicker {
   [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)datePickerDidClick:(DatePickerViewController *)datePicker
+        didSelectStartDate:(NSDate *)startDate
+                   endDate:(NSDate *)endDate {
+  [Statistics logEvent:kStatSearchQuickFilterClick withParameters:@{ kStatCategory: kStatHotel,
+                                                                     kStatDate: @[startDate ? startDate : kStatNone,
+                                                                                  endDate ? endDate : kStatNone]}];
 }
 
 #pragma mark - GuestsPickerViewControllerDelegate
@@ -430,6 +466,18 @@ didSelectStartDate:(NSDate *)startDate
   [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
 }
 
+- (void)guestPickerDidClick:(GuestsPickerViewController *)guestsPicker
+             didSelectRooms:(NSInteger)rooms
+                     adults:(NSInteger)adults
+                   children:(NSInteger)children
+                    infants:(NSInteger)infants {
+  [Statistics logEvent:kStatSearchQuickFilterClick withParameters:@{kStatCategory: kStatHotel,
+                                                                    kStatSearchRooms: @(rooms),
+                                                                    kStatSearchAdults: @(adults),
+                                                                    kStatSearchChildren: @(children),
+                                                                    kStatSearchInfants: @(infants)}];
+}
+
 - (void)guestsPickerDidCancel:(GuestsPickerViewController *)guestsPicker {
   [[MapViewController sharedController] dismissViewControllerAnimated:YES completion:nil];
 }
@@ -440,9 +488,11 @@ didSelectStartDate:(NSDate *)startDate
   switch (self.state) {
     case MWMSearchManagerStateTableSearch:
       self.state = MWMSearchManagerStateMapSearch;
+      [Statistics logEvent:kStatSearchContextAreaClick withParameters:@{kStatValue: kStatMap}];
       break;
     case MWMSearchManagerStateMapSearch:
       self.state = MWMSearchManagerStateTableSearch;
+      [Statistics logEvent:kStatSearchContextAreaClick withParameters:@{kStatValue: kStatList}];
       break;
     default:
       break;

@@ -68674,6 +68674,9 @@ colors {
     name: "TrafficUnknown"
   }
   value {
+    name: "HotelPriceText"
+  }
+  value {
     name: "TransitTransferOuterMarker"
   }
   value {
@@ -68944,6 +68947,10 @@ colors {
   value {
     name: "RouteFake"
     color: 11053224
+  }
+  value {
+    name: "PoiVisitedMask"
+    color: 1308622847
   }
   value {
     name: "RouteArrowsMaskBicycle"

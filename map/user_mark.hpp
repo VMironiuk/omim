@@ -78,7 +78,7 @@ public:
   df::DepthLayer GetDepthLayer() const override { return df::DepthLayer::UserMarkLayer; }
   drape_ptr<TitlesInfo> GetTitleDecl() const override { return nullptr; }
   drape_ptr<ColoredSymbolZoomInfo> GetColoredSymbols() const override { return nullptr; }
-  drape_ptr<SymbolNameZoomInfo> GetBadgeNames() const override { return nullptr; }
+  drape_ptr<BageInfo> GetBadgeInfo() const override { return nullptr; }
   drape_ptr<SymbolSizes> GetSymbolSizes() const override { return nullptr; }
   drape_ptr<SymbolOffsets> GetSymbolOffsets() const override { return nullptr; }
   uint16_t GetPriority() const override { return static_cast<uint16_t >(Priority::Default); }
@@ -92,6 +92,7 @@ public:
   bool HasCreationAnimation() const override { return false; }
   df::ColorConstant GetColorConstant() const override { return {}; }
   bool IsMarkAboveText() const override { return false; }
+  float GetSymbolOpacity() const override { return 1.0f; }
 
   ms::LatLon GetLatLon() const;
 

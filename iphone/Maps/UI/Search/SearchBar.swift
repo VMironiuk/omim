@@ -35,13 +35,33 @@ final class SearchBar: SolidTouchView {
   @objc var isBookingSearchViewHidden: Bool = true {
     didSet {
       if oldValue != isBookingSearchViewHidden {
-        UIView.animate(withDuration: kDefaultAnimationDuration,
+        if isBookingSearchViewHidden {
+          Statistics.logEvent(kStatSearchQuickFilterOpen, withParameters: [kStatCategory: kStatHotel,
+                                                                           kStatNetwork: Statistics.connectionTypeString()])
+        }
+        UIView.animate(withDuration: kDefaultAnimationDuration / 2,
                        delay: 0,
                        options: [.beginFromCurrentState],
                        animations: {
-                        self.bookingSearchView.isHidden = self.isBookingSearchViewHidden
-                        self.bookingSearchView.alpha = self.isBookingSearchViewHidden ? 0 : 1
-        }, completion: nil)
+                        if self.isBookingSearchViewHidden {
+                          self.bookingSearchView.alpha = 0
+                        } else {
+                          self.bookingSearchView.isHidden = false
+                        }
+        }, completion: { complete in
+          if complete {
+            UIView.animate(withDuration: kDefaultAnimationDuration / 2,
+                           delay: 0, options: [.beginFromCurrentState],
+                           animations: {
+                            if self.isBookingSearchViewHidden {
+                              self.bookingSearchView.isHidden = true
+                            } else {
+                              self.bookingSearchView.alpha = 1
+                            }
+                            self.bookingSearchView.alpha = self.isBookingSearchViewHidden ? 0 : 1
+            }, completion: nil)
+          }
+        })
       }
     }
   }

@@ -83,6 +83,8 @@ colors
   PoiHotelTextOutline-opacity: 0.6;
   PoiDeletedMask-color: #FFFFFF;
   PoiDeletedMask-opacity: 0.3;
+  PoiVisitedMask-color: #FFFFFF;
+  PoiVisitedMask-opacity: 0.7;
   DefaultTrackColor-color: #1E96F0;
   RouteMarkPrimaryText-color: #888888;
   RouteMarkPrimaryTextOutline-color: #000000;
@@ -131,4 +133,5 @@ colors
   SpeedCameraMarkOutline-color: #FFFFFF;
   GuideCityMarkText-color: #6639BF;
   GuideOutdoorMarkText-color: #3C8C3C;
+  HotelPriceText-color: #000000;
 }

@@ -38,6 +38,10 @@ struct IDCollections
 class UserPointMark
 {
 public:
+  using SymbolNameZoomInfo = std::map<int, std::string>;
+  using TitlesInfo = std::vector<dp::TitleDecl>;
+  using SymbolSizes = std::vector<m2::PointF>;
+  using SymbolOffsets = std::vector<m2::PointF>;
   struct ColoredSymbolZoomInfo
   {
     std::map<int, df::ColoredSymbolViewParams> m_zoomInfo;
@@ -45,10 +49,12 @@ public:
     bool m_needOverlay = true;
     bool m_addTextSize = false;
   };
-  using SymbolNameZoomInfo = std::map<int, std::string>;
-  using TitlesInfo = std::vector<dp::TitleDecl>;
-  using SymbolSizes = std::vector<m2::PointF>;
-  using SymbolOffsets = std::vector<m2::PointF>;
+  struct BageInfo
+  {
+    SymbolNameZoomInfo m_zoomInfo;
+    std::optional<size_t> m_badgeTitleIndex;
+    std::string m_maskColor;
+  };
 
   static float constexpr kInvalidDepth = dp::kMinDepth - 1.0;
 
@@ -70,7 +76,7 @@ public:
   virtual bool IsVisible() const = 0;
   virtual drape_ptr<TitlesInfo> GetTitleDecl() const = 0;
   virtual drape_ptr<SymbolNameZoomInfo> GetSymbolNames() const = 0;
-  virtual drape_ptr<SymbolNameZoomInfo> GetBadgeNames() const = 0;
+  virtual drape_ptr<BageInfo> GetBadgeInfo() const = 0;
   virtual drape_ptr<ColoredSymbolZoomInfo> GetColoredSymbols() const = 0;
   virtual drape_ptr<SymbolSizes> GetSymbolSizes() const = 0;
   virtual drape_ptr<SymbolOffsets> GetSymbolOffsets() const = 0;
@@ -85,6 +91,7 @@ public:
   virtual bool HasCreationAnimation() const = 0;
   virtual df::ColorConstant GetColorConstant() const = 0;
   virtual bool IsMarkAboveText() const = 0;
+  virtual float GetSymbolOpacity() const = 0;
 
 private:
   kml::MarkId m_id;

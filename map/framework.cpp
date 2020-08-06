@@ -1811,7 +1811,6 @@ void Framework::FillSearchResultsMarks(search::Results::ConstIter begin,
     editSession.ClearGroup(UserMark::Type::SEARCH);
   editSession.SetIsVisible(UserMark::Type::SEARCH, true);
 
-  optional<string> reason;
   for (auto it = begin; it != end; ++it)
   {
     auto const & r = *it;
@@ -1829,10 +1828,7 @@ void Framework::FillSearchResultsMarks(search::Results::ConstIter begin,
     {
       mark->SetPreparing(true);
 
-      if (!reason)
-        reason = platform::GetLocalizedString("booking_map_component_filters");
-
-      m_searchMarks.AppendUnavailable(mark->GetFeatureID(), *reason);
+      m_searchMarks.SetUnavailable(mark->GetFeatureID(), "booking_map_component_filters");
     }
 
     if (r.m_details.m_isSponsoredHotel)
@@ -1857,7 +1853,7 @@ void Framework::FillSearchResultsMarks(search::Results::ConstIter begin,
       m_searchMarks.MarkUnavailableIfNeeded(mark);
     }
 
-    if (isFeature && m_searchMarks.IsUsed(mark->GetFeatureID()))
+    if (isFeature && m_searchMarks.IsVisited(mark->GetFeatureID()))
       mark->SetVisited(true);
 
     if (fn)
@@ -3947,8 +3943,7 @@ void Framework::ShowViewportSearchResults(search::Results const & results, bool 
 
   auto const fillCallback = [this, clear, results](CachedResults filtersResults)
   {
-    string const reason = platform::GetLocalizedString("booking_map_component_availability");
-    auto const postProcessing = [this, filtersResults = move(filtersResults), &reason](SearchMarkPoint & mark)
+    auto const postProcessing = [this, filtersResults = move(filtersResults)](SearchMarkPoint & mark)
     {
       auto const & id = mark.GetFeatureID();
 
@@ -3970,9 +3965,12 @@ void Framework::ShowViewportSearchResults(search::Results const & results, bool 
           mark.SetSale(found);
           break;
         case Type::Availability:
-          mark.SetPreparing(!found);
+          // Some hotels might be unavailable by offline filters.
+          auto const isAvailable = found && !m_searchMarks.IsUnavailable(id);
 
-          if (found && !filterResult.m_extras.empty())
+          mark.SetPreparing(!isAvailable);
+
+          if (isAvailable && !filterResult.m_extras.empty())
           {
             auto const index = distance(features.cbegin(), it);
             auto price = formatter.Format(filterResult.m_extras[index].m_price,
@@ -3988,7 +3986,7 @@ void Framework::ShowViewportSearchResults(search::Results const & results, bool 
             auto const isFilteredOut = binary_search(filteredOut.cbegin(), filteredOut.cend(), id);
 
             if (isFilteredOut)
-              m_searchMarks.AppendUnavailable(mark.GetFeatureID(), reason);
+              m_searchMarks.SetUnavailable(mark.GetFeatureID(), "booking_map_component_availability");
           }
 
           break;
@@ -4005,7 +4003,7 @@ void Framework::ShowViewportSearchResults(search::Results const & results, bool 
 
 void Framework::ClearViewportSearchResults()
 {
-  m_searchMarks.ClearUsed();
+  m_searchMarks.ClearVisited();
   m_searchMarks.ClearUnavailable();
   GetBookmarkManager().GetEditSession().ClearGroup(UserMark::Type::SEARCH);
 }
@@ -4263,14 +4261,14 @@ ugc::Reviews Framework::FilterUGCReviews(ugc::Reviews const & reviews) const
 void Framework::FilterResultsForHotelsQuery(booking::filter::Tasks const & filterTasks,
                                             search::Results const & results, bool inViewport)
 {
-  auto tasksInternal = booking::MakeInternalTasks(results, filterTasks, m_searchMarks, inViewport);
+  auto tasksInternal = booking::MakeInternalTasks(filterTasks, m_searchMarks, inViewport);
   m_bookingFilterProcessor.ApplyFilters(results, move(tasksInternal), filterTasks.GetMode());
 }
 
 void Framework::FilterHotels(booking::filter::Tasks const & filterTasks,
                              vector<FeatureID> && featureIds)
 {
-  auto tasksInternal = booking::MakeInternalTasks(featureIds, filterTasks, m_searchMarks);
+  auto tasksInternal = booking::MakeInternalTasks(filterTasks, m_searchMarks);
   m_bookingFilterProcessor.ApplyFilters(move(featureIds), move(tasksInternal),
                                         filterTasks.GetMode());
 }
@@ -4288,7 +4286,7 @@ void Framework::OnBookingFilterParamsUpdate(booking::filter::Tasks const & filte
   }
 }
 
-booking::AvailabilityParams Framework::GetLastBookingAvailabilityParams() const
+booking::AvailabilityParams const & Framework::GetLastBookingAvailabilityParams() const
 {
   return m_bookingAvailabilityParams;
 }
